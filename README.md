@@ -65,7 +65,7 @@ Atomic Skill 解决一个具体水文分析问题；Workflow 负责组合多个�
 
 Workflow 当前使用抽象 stage，不绑定具体 Skill ID。模拟分析只能提出返回上游 workflow 的建议，不会自动修改数据、模型或参数。
 
-## 首批 Spatial Analysis Skills
+## Spatial Analysis Skills
 
 ```text
 prepare-dem-analysis-grid
