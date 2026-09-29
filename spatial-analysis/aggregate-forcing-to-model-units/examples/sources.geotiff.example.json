@@ -1,0 +1,1 @@
+{"min_coverage_fraction":0.999999,"layers":{"P":{"kind":"geotiff","variable":"P","manifest":"/path/to/rain-manifest.csv","unit":"mm/step","timestep_seconds":3600,"timestamp_semantics":"interval_end"},"evap":{"kind":"geotiff","variable":"PET","manifest":"/path/to/pet-manifest.csv","unit":"mm/step","timestep_seconds":3600,"timestamp_semantics":"interval_end"}}}

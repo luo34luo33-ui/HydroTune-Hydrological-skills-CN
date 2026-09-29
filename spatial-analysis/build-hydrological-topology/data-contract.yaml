@@ -1,0 +1,56 @@
+schema_version: "1.0"
+skill: spatial-analysis/build-hydrological-topology
+inputs:
+  - id: basin_boundary
+    description: 用于最终筛选和像元面积统计的真实流域多边形。
+    required: true
+    format: GDAL-readable vector
+  - id: aligned_hydrology_rasters
+    description: filled DEM、D8、汇流累积、河段编号、Strahler 和子流域栅格。
+    required: true
+    format: GeoTIFF collection
+outputs:
+  - id: subbasin_table
+    description: 子流域面积、像元数、河段集合和出口河段表。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: area_km2
+        semantics: 真实流域掩膜内子流域有效像元数乘像元面积。
+        units: km2
+        spatial_unit: subbasin
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失。
+  - id: reach_table
+    description: 河段属性、上下游、长度、高程和坡度表。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: length_m
+        semantics: D8 像元中心连线与真实流域多边形相交部分的累计长度。
+        units: m
+        spatial_unit: reach
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失或零长度。
+      - name: downstream_reach_id
+        semantics: 筛选后直接下游河段；0 表示离开真实流域。
+        units: identifier
+        spatial_unit: reach
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 0 是明确出口，不是缺失值。
+  - id: topology_artifacts
+    description: 拓扑表、河段 GeoPackage 和三个真实边界裁切栅格。
+    required: true
+    format: CSV, GeoPackage and GeoTIFF
+  - id: run_result
+    description: 构建参数、输入输出哈希、检查和 provenance。
+    required: true
+    format: JSON
+invariants:
+  - 上下游关系必须来自完整 buffer 范围的 D8 追踪。
+  - 所有保留河段必须映射到正子流域编号并具有有效几何。
+  - 拓扑必须无环、无自环且层级覆盖全部河段。
+  - 下游离开真实流域的河段必须使用 0 表示出口。

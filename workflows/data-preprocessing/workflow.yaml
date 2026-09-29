@@ -1,0 +1,99 @@
+schema_version: "1.0"
+workflow: data-preprocessing
+stages:
+  - id: source_inventory
+    type: abstract
+    description: 盘点时序与空间输入、provenance 和已确认元数据。
+    depends_on: []
+    inputs:
+      - raw_hydrometeorological_data
+      - optional_spatial_data
+      - confirmed_metadata
+    outputs:
+      - source_inventory
+      - unresolved_metadata
+    qc:
+      required: true
+      checks:
+        - 每个输入均记录来源、范围和可读性
+        - 推断信息与用户确认信息明确分开
+  - id: temporal_quality_control
+    type: abstract
+    description: 检查时间轴、重复、缺测、异常、单位与变量语义。
+    depends_on:
+      - source_inventory
+    inputs:
+      - source_inventory
+    outputs:
+      - quality_checked_timeseries
+      - temporal_qc_evidence
+    qc:
+      required: true
+      checks:
+        - 时间分辨率、时区和连续性有明确证据
+        - 缺测和异常处理未跨越独立事件边界
+  - id: flood_event_identification
+    type: abstract
+    description: 识别降雨和洪水事件、边界、峰值与前期状态证据。
+    depends_on:
+      - temporal_quality_control
+    inputs:
+      - quality_checked_timeseries
+    outputs:
+      - event_collection
+      - event_attributes
+    qc:
+      required: true
+      checks:
+        - 每个事件保留唯一标识和起止边界
+        - 识别阈值和方法来源可追溯
+  - id: spatial_preprocessing
+    type: abstract
+    description: 在目标需要时整理 DEM、边界、出口、站点、河网和子流域。
+    depends_on:
+      - source_inventory
+    inputs:
+      - source_inventory
+    outputs:
+      - prepared_spatial_inputs
+      - spatial_availability
+    qc:
+      required: false
+      checks:
+        - 空间输入不可用时记录原因
+        - 坐标参考系和几何有效性有明确记录
+  - id: topology_validation
+    type: abstract
+    description: 验证站点、河段、子流域和模型单元的上下游及汇流关系。
+    depends_on:
+      - spatial_preprocessing
+    inputs:
+      - prepared_spatial_inputs
+    outputs:
+      - validated_hydrological_topology
+    qc:
+      required: false
+      checks:
+        - 拓扑不存在断裂、非法自环或多义出口
+        - 空间连接具有水文语义而非仅几何邻接
+  - id: model_ready_output_validation
+    type: abstract
+    description: 汇合时序、事件与可选空间分支并声明建模就绪性。
+    depends_on:
+      - flood_event_identification
+      - topology_validation
+    inputs:
+      - quality_checked_timeseries
+      - event_collection
+      - validated_hydrological_topology
+      - spatial_availability
+    outputs:
+      - model_ready_data_structure
+      - readiness_assessment
+    qc:
+      required: true
+      checks:
+        - 输出满足目标模型所需的时间与空间结构
+        - unavailable、warning 和待确认事项未被静默丢弃
+feedback_targets: []
+

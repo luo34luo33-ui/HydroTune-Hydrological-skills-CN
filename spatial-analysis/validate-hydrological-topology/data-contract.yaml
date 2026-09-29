@@ -1,0 +1,41 @@
+schema_version: "1.0"
+skill: spatial-analysis/validate-hydrological-topology
+inputs:
+  - id: build_result
+    description: build-hydrological-topology 产生或外部兼容的 result.json。
+    required: true
+    format: JSON
+  - id: expected_outlets
+    description: 用户或确定性项目配置确认的正整数出口数量。
+    required: true
+    format: integer parameter
+outputs:
+  - id: topology_checks
+    description: 逐项 PASS、WARN、FAIL 结果及证据。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: status
+        semantics: 单项拓扑质量检查状态。
+        units: PASS, WARN or FAIL
+        spatial_unit: check
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失。
+  - id: topology_report
+    description: 稳定文本格式的拓扑检查摘要。
+    required: true
+    format: UTF-8 text
+  - id: topology_figure
+    description: 用于人工复核河段、子流域和出口的检查图。
+    required: true
+    format: PNG
+  - id: run_result
+    description: 机器可读的最终 QC 状态、检查和输出哈希。
+    required: true
+    format: JSON
+invariants:
+  - 任一 FAIL 都必须使 result.json 状态为 error 且退出码为 2。
+  - 验证过程不得修改或修补 HydroBase 输入 artifacts。
+  - 预期出口数量必须来自用户确认或确定性项目配置。
+  - 上游 warning 必须保留在最终检查证据中。

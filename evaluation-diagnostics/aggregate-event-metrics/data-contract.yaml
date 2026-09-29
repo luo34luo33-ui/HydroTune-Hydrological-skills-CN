@@ -1,0 +1,53 @@
+schema_version: "1.0"
+skill: evaluation-diagnostics/aggregate-event-metrics
+inputs:
+  - id: metrics_table
+    description: 逐场次指标表，通常由 compute-event-flood-metrics 产出，一场一行。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: value_column
+        semantics: 待聚合的数值指标列，由 --value-columns 显式列出。
+        units: 沿用上游指标单位
+        time_step: not applicable
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 非数值单元不计入统计，但必须计数并记录。
+      - name: pass_column
+        semantics: 合格判定列，取值为「是」时计入合格，由 --pass-columns 显式列出。
+        units: categorical
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 非「是」的值不计入合格，不静默替换。
+  - id: pass_thresholds
+    description: 合格率计算所需的阈值，必须由使用者显式给出。
+    required: false
+    format: CLI argument or JSON
+outputs:
+  - id: aggregate_metrics
+    description: 分组汇总表，每组一行，含各数值列的统计量与各合格列的合格率。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: mean
+        semantics: 等权算术平均，不提供加权口径。
+        units: 沿用上游指标单位
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 全部不可用或分组为空时记为 unavailable。
+      - name: qualified_rate
+        semantics: 合格率，等于判定为「是」的场次数除以该分组场次总数。
+        units: fraction
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 未给出阈值时记为 unavailable。
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+invariants:
+  - 聚合必须等权，不得引入未声明的权重。
+  - 无法解析为数值的单元必须排除并计数，不得静默丢弃。
+  - 合格阈值必须显式给出；缺失时合格率记为 unavailable。
+  - 本 Skill 不得重新计算任何场次指标，只消费上游结果。
+  - 输出只写入 --output-dir；不修改输入指标表。

@@ -1,0 +1,29 @@
+schema_version: "1.0"
+skill: visualization-reporting/visualize-model-calibration
+inputs:
+  - id: calibration_result
+    description: 五种受支持 model-calibration Skill 之一生成且 artifact 哈希可验证的 result.json。
+    required: true
+    format: JSON
+outputs:
+  - id: calibration_overview
+    description: 收敛轨迹、参数位置、两 split 指标和运行证据总览。
+    required: true
+    format: PNG, SVG and JSON
+  - id: validation_process
+    description: continuous 全验证期或 event_collection 逐场观测模拟过程图。
+    required: true
+    format: PNG, SVG and JSON
+  - id: validation_scatter
+    description: 仅使用 validation scored 样本的观测模拟散点图。
+    required: true
+    format: PNG, SVG and JSON
+  - id: run_result
+    description: 图件哈希、QC、warning 与 provenance。
+    required: true
+    format: JSON
+invariants:
+  - 不得重算或替换上游率定与验证指标。
+  - event_collection 的不同事件不得拼接成连续序列。
+  - PNG 必须精确为 2400×1600 像素且 SVG 使用同一布局。
+  - 散点图只能使用 validation 中 scored=true 的样本。

@@ -1,0 +1,15 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-lumped-topmodel
+inputs:
+  - {id: terrain_result, required: true, format: JSON, description: Verified terrain result with hashed topographic index and distance area distributions.}
+  - {id: forcing, required: true, format: CSV, description: Continuous time P PET table with timezone aware interval end and mm per step depths.}
+  - {id: params, required: true, format: JSON or YAML, description: Explicit model configuration conforming to examples/model_config.schema.json.}
+outputs:
+  - {id: process, required: true, format: CSV, description: Component depths outlet discharge states and water balance residual.}
+  - {id: final_state, required: true, format: JSON, description: End of series states in metres including un-routed water.}
+  - {id: model_config, required: true, format: JSON, description: Exact configuration snapshot.}
+  - {id: run_result, required: true, format: JSON, description: Input and output hashes QC and provenance.}
+invariants:
+  - Every forcing step is present exactly once; warmup and simulation bounds cover the entire series.
+  - Outlet depth equals basin-area-normalized discharge using the explicit timestep.
+  - Water balance includes the routing queue remaining at series end.

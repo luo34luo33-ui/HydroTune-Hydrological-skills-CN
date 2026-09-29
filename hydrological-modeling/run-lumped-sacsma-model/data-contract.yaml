@@ -1,0 +1,121 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-lumped-sacsma-model
+inputs:
+  - id: forcing_table
+    description: 包含时间、面平均降雨与蒸发能力的 forcing 表；event 模式下可由一个目录或一个多 sheet 工作簿提供多场次。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: P
+        semantics: 面平均降雨，每步长水深；由调用方确认为面平均值。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN（源码为日水量核算）
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止；不得静默填 0 或插值后继续。
+      - name: PET
+        semantics: 蒸发能力，每步长水深，驱动 ET1–ET5 分层扣蒸；来源与处理方法由调用方记录。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止。
+      - name: time
+        semantics: 严格递增且等间隔的时间索引。
+        units: datetime
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 空值或重复值必须停止。
+  - id: parameter_set
+    description: SAC-SMA 16 参数集，全部必填；源码无参数范围定义，本 Skill 不引入外部先验。
+    required: true
+    format: JSON or YAML
+    variables:
+      - name: UZTWM_UZFWM_LZTWM_LZFPM_LZFSM
+        semantics: 上张力水、上自由水、下张力水、下主自由水、下补自由水五个水库容量。
+        units: mm
+        state_or_flux: state
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失或非正必须停止；源码行为即越界取值。
+      - name: UZK_LZPK_LZSK
+        semantics: 上自由水与下区主、补自由水的日消耗率；非日步长时不自动换算。
+        units: 1/day
+        time_step: 与源码日核算语义绑定
+        state_or_flux: flux
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失或越界 (0,1] 必须停止。
+      - name: ADIMP_PCTIM_RIVA_PFREE_RSERV
+        semantics: 附加不透水、永久不透水、河岸植被、下渗进自由水、不可转移比例，均 ∈ [0,1]；ADIMP+PCTIM 必须小于 1。
+        units: decimal fraction
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失或越界必须停止。
+      - name: ZPERC_REXP_SIDE
+        semantics: 下渗需求尺度、下渗需求形状、深层补给比；REXP 与 SIDE 必须非负。
+        units: dimensionless
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失或为负必须停止。
+  - id: basin_properties
+    description: 流域属性，由 CLI 显式提供：--area-km2（流域面积，用于 mm→m3/s 换算）、--timestep-hours（时间步长）。
+    required: true
+    format: CLI arguments
+outputs:
+  - id: simulation_table
+    description: 逐时步状态与通量表，含源码等价 Q_MM（mm/步）、换算后 Q（m3/s）、地表/基流分量与六状态列；event 模式带场次标识列。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: Q_MM
+        semantics: 源码等价的流域出口总出流（mm per step），tot_outflow = surf + base − et4，与源码逐位一致，用作等价锚点；可能与 SURF+BASE 之和不等的源码语义原样保留。
+        units: mm per time step
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: Q
+        semantics: 流域出口总出流，Q_MM 乘以面积与步长换算系数。
+        units: m3/s
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: SURF_BASE
+        semantics: 调整后的地表流（ROIMP+SSUR+SIF+SDRO 经 et4 调整）与基流（主、补自由水河道分量）；分量列 ROIMP/SSUR/SIF/SDRO 同步输出。
+        units: mm per time step
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: UZTWC_UZFWC_LZTWC_LZFSC_LZFPC_ADIMC
+        semantics: 六个水库蓄水状态；要求非负，LZTWC 因库间溢出回补可能瞬时超过 LZTWM（源码行为）。
+        units: mm
+        time_step: 与输入时间步长一致
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+  - id: event_index
+    description: event 模式下的场次清单，记录每场的行数、起止时间与预热步数。
+    required: false
+    format: CSV
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、初始状态来源、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+warmup_period:
+  required: false
+  semantics: 由 --warmup-steps 显式声明的前 N 步标记 is_warmup 且不纳入模拟期统计；源码没有 warmup 机制，标记段照常递推。
+simulation_period:
+  required: true
+  semantics: 扣除预热后的全部时步；模拟期为空即失败，退出码 2。
+invariants:
+  - 时间轴必须严格递增、等间隔，并与 --timestep-hours 一致。
+  - 步长非 24 小时时必须记录 WARN：源码 depletion 玉率为 1/day、ninc 与 ET 分层均为日核算，参数不自动换算，结果未经验证。
+  - 六个水库状态与总出流必须非负；LZTWC 允许因库间溢出回补瞬时超过 LZTWM（源码行为，不判失败）。
+  - 状态与通量必须全部有限，出现 NaN 或 Inf 即失败。
+  - Q_MM 必须与源码 sacsma() 输出逐位一致，Q 由显式面积与步长换算；tot_outflow = surf + base − et4 的源码语义（分量后调整、总量不回算）原样保留。
+  - 负出流兜底、阈值复位与库间溢出回补全部截断计数并以 warning 报告。
+  - 水量平衡残差以 warning 报告：SIDE 非河道分量、ET4 扣出流与库间回补使闭合为近似，不作失败判定。
+  - 初始状态缺省时使用源码等价默认 [0,0,500,500,500,0] mm，并在 result.json 标注来源。
+  - 输出只写入 --output-dir，forcing 缺测或参数越界即停止，不静默填充也不静默复用旧结果。

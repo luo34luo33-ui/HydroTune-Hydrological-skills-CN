@@ -1,0 +1,24 @@
+schema_version: "1.0"
+skill: visualization-reporting/visualize-flood-event-atlas
+inputs:
+  - id: extract_result
+    description: extract-flood-events 生成且 artifacts 哈希可验证的 result.json。
+    required: true
+    format: JSON
+outputs:
+  - id: overview_figure
+    description: 全时段流量、基流和事件洪峰总览。
+    required: true
+    format: PNG, SVG and JSON
+  - id: event_figures
+    description: 所选事件的固定逐场水文过程图。
+    required: false
+    format: PNG, SVG and JSON
+  - id: run_result
+    description: 符合 visualization-run-result schema 的运行结果。
+    required: true
+    format: JSON
+invariants:
+  - 绘图不得修改事件边界、分量或已有指标。
+  - PNG 必须精确为 2400×1600 像素，SVG 使用同一布局。
+  - 长序列抽稀只用于显示且必须记录方法和原始点数。

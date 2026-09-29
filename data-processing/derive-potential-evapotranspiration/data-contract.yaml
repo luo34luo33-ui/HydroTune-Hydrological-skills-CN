@@ -1,0 +1,31 @@
+schema_version: "1.0"
+skill: data-processing/derive-potential-evapotranspiration
+inputs:
+  - id: meteorology
+    description: 时间、站点、气温摄氏度、净辐射 MJ/m2/步、水汽压 kPa、2 m 风速 m/s；日尺度另有 Tmax/Tmin，小时尺度另有 G。
+    required: true
+    format: CSV, XLSX or Parquet
+  - id: stations
+    description: source_id,latitude_deg,elevation_m。
+    required: true
+    format: CSV, XLSX or Parquet
+  - id: config
+    description: 尺度、时区、步长、列映射与可选 PET/E0 转换。
+    required: true
+    format: JSON
+outputs:
+  - id: eto
+    description: 每站每步 ETo_mm 原值。
+    required: true
+    format: CSV
+  - id: mapped_evap
+    description: 显式映射后 time,source_id,variable,depth_mm。
+    required: false
+    format: CSV
+  - id: result
+    description: 输入产物哈希和 QC。
+    required: true
+    format: JSON
+invariants:
+  - ETo 与 PET/E0 不等同；转换需要显式配置。
+  - 不用缺项估算或自动填补。

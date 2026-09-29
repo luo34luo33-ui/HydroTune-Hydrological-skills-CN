@@ -1,0 +1,25 @@
+schema_version: "1.0"
+skill: visualization-reporting/visualize-dem-hydrology-atlas
+inputs:
+  - id: prepare_result
+    description: prepare-dem-analysis-grid 生成且 artifacts 哈希可验证的 result.json。
+    required: true
+    format: JSON
+  - id: extract_result
+    description: extract-dem-stream-network 生成的可选 result.json；缺失时仅生成两张 DEM 图。
+    required: false
+    format: JSON
+outputs:
+  - id: atlas_figures
+    description: 每个固定模板对应的 PNG、SVG 和 figure.json。
+    required: true
+    format: PNG, SVG and JSON
+  - id: run_result
+    description: 符合 visualization-run-result schema 的总运行结果。
+    required: true
+    format: JSON
+invariants:
+  - PNG 必须精确为 2400×1600 像素，SVG 与 PNG 使用相同布局。
+  - 所有使用的输入 artifact 必须先通过 SHA-256、CRS 和网格检查。
+  - 显示变换不得修改或覆盖任何上游空间数据。
+  - 中文和英文只改变文字，不改变图层、色带或数据表达。

@@ -1,0 +1,1 @@
+{"schema_version":"1.0","variable":"P","columns":{"time":"time","source_id":"source_id","value":"rain_mm"},"unit":"mm/step","value_semantics":"step_depth","timezone":"Asia/Shanghai","source_timezone_mode":"local_naive","timestamp_semantics":"interval_end","timestep_seconds":3600}

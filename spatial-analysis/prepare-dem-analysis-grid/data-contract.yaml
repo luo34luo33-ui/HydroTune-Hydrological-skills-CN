@@ -1,0 +1,42 @@
+schema_version: "1.0"
+skill: spatial-analysis/prepare-dem-analysis-grid
+inputs:
+  - id: source_dem
+    description: 具有已确认水平 CRS 和垂直单位的单波段高程栅格。
+    required: true
+    format: GeoTIFF or GDAL-readable raster
+    variables:
+      - name: elevation
+        semantics: 地表高程；输入单位由 vertical-unit 明确声明。
+        units: m or ft as confirmed
+        coordinate_reference_system: 必须由源文件明确给出
+        spatial_unit: raster cell
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 使用源 NoData；没有 NoData 时仅有限数值视为有效高程。
+  - id: basin_boundary
+    description: 真实研究流域的有效多边形边界。
+    required: true
+    format: GDAL-readable vector
+outputs:
+  - id: metric_dem
+    description: 米制水平 CRS 且高程统一为米的标准 DEM。
+    required: true
+    format: GeoTIFF
+  - id: analysis_dem
+    description: 按确认 buffer 裁出的水文分析 DEM。
+    required: true
+    format: GeoTIFF
+  - id: normalized_basin
+    description: 修复、合并并投影到分析 CRS 的真实流域边界。
+    required: true
+    format: GeoPackage
+  - id: run_result
+    description: 符合 spatial-run-result schema 的确定性运行结果。
+    required: true
+    format: JSON
+invariants:
+  - 输出水平 CRS 必须是以米为线性单位的投影坐标系。
+  - 输出高程单位必须为米，且输入单位和换算必须记录。
+  - DEM 必须完整覆盖真实流域；外扩覆盖不足必须保留 warning。
+  - 原始 DEM 和边界不得被修改。

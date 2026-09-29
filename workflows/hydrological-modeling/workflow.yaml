@@ -1,0 +1,125 @@
+schema_version: "1.0"
+workflow: hydrological-modeling
+stages:
+  - id: input_readiness
+    type: abstract
+    description: 检查预处理数据、事件结构、空间拓扑和元数据是否满足建模目标。
+    depends_on: []
+    inputs:
+      - model_ready_data_structure
+      - readiness_assessment
+    outputs:
+      - modeling_inputs
+      - modeling_gaps
+    qc:
+      required: true
+      checks:
+        - 所有必需输入及单位均有确定来源
+        - 数据形态与计划的状态传递方式一致
+  - id: spatial_structure_selection
+    type: abstract
+    description: 选择集总式或半分布式建模空间结构。
+    depends_on:
+      - input_readiness
+    inputs:
+      - modeling_inputs
+    outputs:
+      - selected_spatial_structure
+    qc:
+      required: true
+      checks:
+        - 选择由建模目标和可用证据支持
+        - 半分布式路径具备经验证拓扑
+  - id: lumped_model_setup
+    type: abstract
+    description: 为单流域或单模型单元建立状态、参数和输入映射。
+    depends_on:
+      - spatial_structure_selection
+    inputs:
+      - selected_spatial_structure
+    outputs:
+      - optional_lumped_model_configuration
+    qc:
+      required: false
+      checks:
+        - 仅在选择集总式路径时产生配置
+  - id: semi_distributed_model_setup
+    type: abstract
+    description: 为子流域或模型单元建立局地产流、局部汇流和拓扑连接。
+    depends_on:
+      - spatial_structure_selection
+    inputs:
+      - selected_spatial_structure
+      - validated_hydrological_topology
+    outputs:
+      - optional_semi_distributed_configuration
+    qc:
+      required: false
+      checks:
+        - 仅在选择半分布式路径时产生配置
+        - 每个模型单元的上下游关系可追溯
+  - id: state_parameter_initialization
+    type: abstract
+    description: 汇合所选分支并确认状态、参数、warm-up、routing 和运行期间。
+    depends_on:
+      - lumped_model_setup
+      - semi_distributed_model_setup
+    inputs:
+      - optional_lumped_model_configuration
+      - optional_semi_distributed_configuration
+    outputs:
+      - runnable_model_configuration
+    qc:
+      required: true
+      checks:
+        - 参数与状态均来自 artifact、率定结果或用户确认
+        - warm-up 和 simulation period 已明确
+        - 必需 routing 未被绕过
+  - id: warmup
+    type: abstract
+    description: 按已确认的数据形态和状态规则执行模型 warm-up。
+    depends_on:
+      - state_parameter_initialization
+    inputs:
+      - runnable_model_configuration
+    outputs:
+      - warmed_model_state
+    qc:
+      required: true
+      checks:
+        - 独立事件之间不传递状态
+        - warm-up 期间和输出状态可追溯
+  - id: simulation
+    type: abstract
+    description: 运行前向模拟并保留运行状态、warning 和错误证据。
+    depends_on:
+      - warmup
+    inputs:
+      - runnable_model_configuration
+      - warmed_model_state
+    outputs:
+      - raw_simulation_results
+      - run_status
+    qc:
+      required: true
+      checks:
+        - error 状态不会被包装为成功结果
+        - warning 对科学有效性的影响已评估
+  - id: output_standardization
+    type: abstract
+    description: 标准化模拟序列、模型上下文、参数和 provenance。
+    depends_on:
+      - simulation
+    inputs:
+      - raw_simulation_results
+      - run_status
+    outputs:
+      - standardized_simulation_results
+      - model_run_record
+    qc:
+      required: true
+      checks:
+        - 输出时间、单位和空间单元与观测可对齐
+        - 参数、软件版本和输入引用完整
+feedback_targets: []
+

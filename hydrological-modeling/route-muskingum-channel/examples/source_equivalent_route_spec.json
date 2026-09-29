@@ -1,0 +1,23 @@
+{
+  "_note": "源码等价示例配置，仅用于复现 E:/LSTM 新安江+XGB整理.ipynb 的河道演算行为；来源为该 notebook 的 PSO 参数 K_res=1.0、X_res=0.0、X=0.0、n=4，不是通用水文默认值。cascade 布局的 K_l 固定等于时间步长，k 字段仅作记录。源码 Q_total 固定取 Q2（即 cascade 第一级输出），因此这里 output_level 为 first；若要完整的 4 级串联结果，请改为 final。",
+  "routes": [
+    {
+      "id": "local_channel",
+      "column": "Qt",
+      "layout": "cascade",
+      "k": 1.0,
+      "x": 0.0,
+      "reaches": 4,
+      "output_level": "first",
+      "q0": null
+    },
+    {
+      "id": "upstream_reservoir",
+      "column": "Qres_in",
+      "layout": "single",
+      "k": 1.0,
+      "x": 0.0,
+      "q0": null
+    }
+  ]
+}

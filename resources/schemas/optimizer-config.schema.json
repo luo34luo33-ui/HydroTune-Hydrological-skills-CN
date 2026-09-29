@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.local/schemas/optimizer-config.schema.json",
+  "title": "HydroTune optimizer configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "algorithm", "seed", "max_evaluations", "max_failed_evaluations"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "algorithm": {"enum": ["de", "ga", "pso", "sce-ua", "two-stage"]},
+    "seed": {"type": "integer", "minimum": 0}, "max_evaluations": {"type": "integer", "minimum": 1}, "max_failed_evaluations": {"type": "integer", "minimum": 0},
+    "population_multiplier": {"type": "integer", "minimum": 1}, "mutation_factor": {"type": "number", "exclusiveMinimum": 0, "maximum": 2}, "crossover_probability": {"type": "number", "minimum": 0, "maximum": 1}, "max_generations": {"type": "integer", "minimum": 1}, "tolerance": {"type": "number", "minimum": 0}, "polish": {"type": "boolean"},
+    "population_size": {"type": "integer", "minimum": 2}, "tournament_size": {"type": "integer", "minimum": 2}, "elite_count": {"type": "integer", "minimum": 1}, "mutation_probability": {"type": "number", "minimum": 0, "maximum": 1}, "gene_mutation_probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "particle_count": {"type": "integer", "minimum": 2}, "max_iterations": {"type": "integer", "minimum": 1}, "inertia_weight": {"type": "number", "minimum": 0}, "cognitive_coefficient": {"type": "number", "minimum": 0}, "social_coefficient": {"type": "number", "minimum": 0}, "velocity_limit_fraction": {"type": "number", "exclusiveMinimum": 0},
+    "complex_count": {"type": "integer", "minimum": 1}, "points_per_complex": {"type": "integer", "minimum": 2}, "evolution_steps": {"type": "integer", "minimum": 1}, "max_loops": {"type": "integer", "minimum": 1}, "reflection_coefficient": {"type": "number", "exclusiveMinimum": 0}, "contraction_coefficient": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}, "stall_loops": {"type": "integer", "minimum": 1}, "objective_tolerance": {"type": "number", "minimum": 0},
+    "annealing_max_evaluations": {"type": "integer", "minimum": 1}, "local_max_evaluations": {"type": "integer", "minimum": 1}, "annealing_max_iterations": {"type": "integer", "minimum": 1}, "local_max_iterations": {"type": "integer", "minimum": 1}, "initial_temperature": {"type": "number", "exclusiveMinimum": 0}, "restart_temperature_ratio": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}, "visit": {"type": "number", "exclusiveMinimum": 1, "maximum": 3}, "accept": {"type": "number", "maximum": -5}, "local_ftol": {"type": "number", "minimum": 0}
+  },
+  "oneOf": [
+    {"properties": {"algorithm": {"const": "de"}}, "required": ["population_multiplier", "mutation_factor", "crossover_probability", "max_generations", "tolerance", "polish"]},
+    {"properties": {"algorithm": {"const": "ga"}}, "required": ["population_size", "max_generations", "tournament_size", "elite_count", "crossover_probability", "mutation_probability", "gene_mutation_probability"]},
+    {"properties": {"algorithm": {"const": "pso"}}, "required": ["particle_count", "max_iterations", "inertia_weight", "cognitive_coefficient", "social_coefficient", "velocity_limit_fraction"]},
+    {"properties": {"algorithm": {"const": "sce-ua"}}, "required": ["complex_count", "points_per_complex", "evolution_steps", "max_loops", "reflection_coefficient", "contraction_coefficient", "stall_loops", "objective_tolerance"]},
+    {"properties": {"algorithm": {"const": "two-stage"}}, "required": ["annealing_max_evaluations", "local_max_evaluations", "annealing_max_iterations", "local_max_iterations", "initial_temperature", "restart_temperature_ratio", "visit", "accept", "local_ftol"]}
+  ]
+}

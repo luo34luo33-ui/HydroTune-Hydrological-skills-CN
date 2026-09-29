@@ -1,0 +1,6 @@
+{
+  "template_version": "hydrotune.flood-event-atlas.v1",
+  "canvas": {"width_px": 2400, "height_px": 1600, "figsize_inches": [12, 8], "dpi": 200, "background": "#F7F6F2", "panel_background": "#FCFBF8"},
+  "typography": {"zh": ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC"], "en": ["DejaVu Sans", "Arial", "Liberation Sans"], "title_size": 22, "subtitle_size": 11, "body_size": 10, "small_size": 8},
+  "colors": {"ink": "#17232D", "muted_ink": "#66717A", "discharge": "#123F63", "baseflow": "#2D7A6B", "quickflow": "#8FC7D8", "peak": "#C47A16", "event_band": "#DCEAF0", "warmup_band": "#E5E1D8", "pass": "#287A53", "warn": "#C47A16", "fail": "#B33A32", "grid": "#D8D6D0"}
+}

@@ -1,0 +1,116 @@
+schema_version: "1.0"
+workflow: simulation-analysis
+stages:
+  - id: observation_simulation_alignment
+    type: abstract
+    description: 对齐观测、模拟、时间、单位、空间单元和有效评价期间。
+    depends_on: []
+    inputs:
+      - standardized_simulation_results
+      - observations
+      - model_run_record
+    outputs:
+      - comparable_evaluation_dataset
+      - alignment_evidence
+    qc:
+      required: true
+      checks:
+        - 观测与模拟的时间、单位和空间含义一致
+        - warm-up 和无效期间已从评价范围排除
+  - id: baseline_performance
+    type: abstract
+    description: 计算基础性能、水量平衡和必要的基准比较。
+    depends_on:
+      - observation_simulation_alignment
+    inputs:
+      - comparable_evaluation_dataset
+    outputs:
+      - baseline_metrics
+      - water_balance_evidence
+    qc:
+      required: true
+      checks:
+        - 指标定义、方向和评价样本数明确
+        - 指标未脱离适用场景单独解释
+  - id: temporal_event_regime_diagnostics
+    type: abstract
+    description: 诊断时序、洪水事件、高中低流量和季节性误差模式。
+    depends_on:
+      - baseline_performance
+    inputs:
+      - comparable_evaluation_dataset
+      - baseline_metrics
+    outputs:
+      - temporal_patterns
+      - event_patterns
+      - flow_regime_patterns
+      - seasonal_patterns
+    qc:
+      required: true
+      checks:
+        - 事件比较保留事件边界和样本支持度
+        - 流量分区和季节划分规则可追溯
+  - id: spatial_parameter_diagnostics
+    type: abstract
+    description: 在输入可用时分析空间误差与参数行为。
+    depends_on:
+      - baseline_performance
+    inputs:
+      - comparable_evaluation_dataset
+      - model_run_record
+    outputs:
+      - optional_spatial_patterns
+      - optional_parameter_patterns
+    qc:
+      required: false
+      checks:
+        - 不可用的空间或参数证据明确标记原因
+        - 参数相关性不被直接解释为物理因果
+  - id: evidence_hypothesis_synthesis
+    type: abstract
+    description: 综合模式、支持证据、反证和不确定性，形成有界水文假设。
+    depends_on:
+      - temporal_event_regime_diagnostics
+      - spatial_parameter_diagnostics
+    inputs:
+      - temporal_patterns
+      - event_patterns
+      - flow_regime_patterns
+      - seasonal_patterns
+      - optional_spatial_patterns
+      - optional_parameter_patterns
+    outputs:
+      - diagnostic_hypotheses
+      - suggested_next_analyses
+    qc:
+      required: true
+      checks:
+        - 每个假设均列出支持证据、反证和限制
+        - 相关性、偏差和排名未被写成确定因果
+  - id: structured_report
+    type: abstract
+    description: 生成区分事实、证据、推断、建议和待确认事项的报告。
+    depends_on:
+      - evidence_hypothesis_synthesis
+    inputs:
+      - baseline_metrics
+      - diagnostic_hypotheses
+      - suggested_next_analyses
+    outputs:
+      - simulation_analysis_report
+      - feedback_recommendations
+    qc:
+      required: true
+      checks:
+        - 报告中的结论均可追溯到输入或分析证据
+        - feedback 仅为建议且不会自动触发上游变更
+feedback_targets:
+  - from_stage: structured_report
+    workflow: data-preprocessing
+    description: 当证据指向输入质量、事件边界或空间拓扑问题时建议重新检查预处理。
+    automatic: false
+  - from_stage: structured_report
+    workflow: hydrological-modeling
+    description: 当证据指向模型结构、状态、参数或 routing 问题时建议重新检查建模。
+    automatic: false
+

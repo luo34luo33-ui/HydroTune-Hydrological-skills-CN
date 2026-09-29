@@ -1,0 +1,111 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-lumped-dhf-model
+inputs:
+  - id: forcing_table
+    description: 包含时间、面平均降雨与蒸发能力的 forcing 表；event 模式下可由一个目录或一个多 sheet 工作簿提供多场次。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: P
+        semantics: 面平均降雨，每步长水深；由调用方确认为面平均值。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止；不得静默填 0 或插值后继续。
+      - name: PET
+        semantics: 蒸发能力，每步长水深，乘以蒸系数 KC 后与降雨同量纲相减。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止；来源与处理方法由调用方记录。
+      - name: time
+        semantics: 严格递增且等间隔的时间索引。
+        units: datetime
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 空值或重复值必须停止。
+  - id: parameter_set
+    description: DHF 18 参数集，规范键名 S0/U0/D0/KC/KW/K2/KA/G/A/B/B0/K0/N/DD/CC/COE/DDL/CCL，兼容源脚本别名 K。
+    required: true
+    format: JSON or YAML
+    variables:
+      - name: S0
+        semantics: 表层蓄水容量。
+        units: mm
+        state_or_flux: state
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止，不得使用经验默认值。
+      - name: U0
+        semantics: 下层蓄水容量。
+        units: mm
+        state_or_flux: state
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止，不得使用经验默认值。
+      - name: G
+        semantics: 不透水面积比例，取值落在 0 到 1 之间。
+        units: fraction
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止，不得使用经验默认值。
+  - id: basin_properties
+    description: 流域属性，全部由 CLI 显式提供：--river-length-km（主河长）、--area-km2（流域面积）、--timestep-hours（时间步长）。
+    required: true
+    format: CLI arguments
+outputs:
+  - id: simulation_table
+    description: 逐时步状态与通量表，含出口流量 Q、产流分量与状态列；event 模式带场次标识列。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: Q
+        semantics: 流域出口流量，地表与地下单位线卷积之和，负值已按源码行为截断为 0。
+        units: m3/s
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: RUNOFF
+        semantics: 产流总量，等于 Y 与 Y0 之和截负，是汇流卷积的输入。
+        units: mm per time step
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: SA
+        semantics: 表层蓄水状态，必须落在 0 与 S0 之间。
+        units: mm
+        time_step: 与输入时间步长一致
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: YA
+        semantics: 前期影响雨量，非负递推量，驱动单位线时程参数 TM。
+        units: mm
+        time_step: 与输入时间步长一致
+        state_or_flux: state
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+  - id: event_index
+    description: event 模式下的场次清单，记录每场的行数、起止时间与预热步数。
+    required: false
+    format: CSV
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+warmup_period:
+  required: false
+  semantics: 由 --warmup-steps 显式声明；warmup 段从默认状态（SA=0、UA=0、YA=0.5）递推，终态作为模拟期初值并可被 --initial-state 覆盖；warmup 段输出标记 is_warmup 且不纳入模拟期统计。
+simulation_period:
+  required: true
+  semantics: 扣除预热后的全部时步；模拟期为空即失败，退出码 2。
+invariants:
+  - 时间轴必须严格递增、等间隔，并与 --timestep-hours 一致。
+  - 蓄水状态必须满足 0<=SA<=S0、0<=UA<=U0，且 YA>=0。
+  - 状态与通量必须全部有限，出现 NaN 或 Inf 即失败；源码行为中的 NaN 贡献被置零并计数。
+  - 水量平衡残差以 warning 报告，包含单位线卷积在序列末端的截断水量，不作失败判定。
+  - 输出只写入 --output-dir，forcing 缺测或参数越界即停止，不静默填充也不静默复用旧结果。
+  - 汇流经验单位线与产流状态 YA 耦合，本 Skill 自包含产汇流，不把汇流拆给其它 Skill。

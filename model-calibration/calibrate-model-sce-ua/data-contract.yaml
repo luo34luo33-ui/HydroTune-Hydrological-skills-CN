@@ -1,0 +1,13 @@
+schema_version: "1.0"
+skill: model-calibration/calibrate-model-sce-ua
+inputs:
+  - {id: calibration_problem, description: 含评估器、参数、目标、split 和变量语义的 JSON。, required: true, format: JSON}
+  - {id: optimizer_config, description: 含 seed、预算和完整 SCE-UA 参数的 JSON。, required: true, format: JSON}
+outputs:
+  - {id: calibrated_parameters, description: 最优参数及边界证据。, required: true, format: JSON}
+  - {id: calibration_evidence, description: 搜索轨迹、两 split 指标和标准序列。, required: true, format: CSV and JSON}
+  - {id: run_result, description: 状态、哈希、QC 与 provenance。, required: true, format: JSON}
+invariants:
+  - 复形必须在完整种群排序后轮转形成并在每轮后重新洗牌。
+  - validation 不得参与复形演化。
+  - 输出参数必须位于显式边界内。

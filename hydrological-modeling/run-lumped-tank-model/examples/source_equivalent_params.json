@@ -1,0 +1,19 @@
+{
+  "_note": "源码等价示例参数，仅用于复现 tank_simple.py 中 run_tank_model 的 dict.get 演示默认值；它们不是率定值，更不是通用水文默认值。运行时还必须显式提供 --area-km2 与 --timestep-hours（源码硬编码 area=584.0 不作为默认值）。",
+  "t0_is": 10.0,
+  "t0_boc": 0.3,
+  "t0_soc_uo": 0.4,
+  "t0_soc_lo": 0.3,
+  "t0_soh_uo": 80.0,
+  "t0_soh_lo": 30.0,
+  "t1_is": 10.0,
+  "t1_boc": 0.25,
+  "t1_soc": 0.25,
+  "t1_soh": 50.0,
+  "t2_is": 10.0,
+  "t2_boc": 0.15,
+  "t2_soc": 0.15,
+  "t2_soh": 35.0,
+  "t3_is": 10.0,
+  "t3_soc": 0.02
+}

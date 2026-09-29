@@ -1,0 +1,8 @@
+{
+  "_note": "源码等价示例配置，仅用于复现 E:/LSTM 新安江+XGB整理.ipynb 中 train_xgb_model 的调用参数；来源为该 notebook 的 xgb_params 与调用实参，不是通用机器学习默认值。random_state 不在此处，必须由 --random-state 显式给出。",
+  "n_estimators": 500,
+  "learning_rate": 0.04,
+  "max_depth": 5,
+  "subsample": 0.8,
+  "colsample_bytree": 0.8
+}

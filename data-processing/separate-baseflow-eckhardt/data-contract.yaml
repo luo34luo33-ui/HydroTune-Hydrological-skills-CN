@@ -1,0 +1,33 @@
+schema_version: "1.0"
+skill: data-processing/separate-baseflow-eckhardt
+inputs:
+  - id: prepare_result
+    description: prepare-discharge-timeseries 生成且哈希可验证的 result.json。
+    required: true
+    format: JSON
+outputs:
+  - id: flow_components
+    description: 标准时序附加基流、直接径流和直接径流比例。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: baseflow_m3_s
+        semantics: Eckhardt 数字滤波得到的基流分量。
+        units: m3/s
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 不允许缺测。
+      - name: quickflow_m3_s
+        semantics: discharge_m3_s 减去 baseflow_m3_s。
+        units: m3/s
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 不允许缺测。
+  - id: run_result
+    description: 运行状态、参数、QC 与文件哈希。
+    required: true
+    format: JSON
+invariants:
+  - baseflow_m3_s 必须介于零和 discharge_m3_s 之间。
+  - discharge_m3_s 必须等于 baseflow_m3_s 与 quickflow_m3_s 之和。
+  - 自动 alpha 的证据不足时不得使用经验回退值。

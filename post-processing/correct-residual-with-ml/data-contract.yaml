@@ -1,0 +1,88 @@
+schema_version: "1.0"
+skill: post-processing/correct-residual-with-ml
+inputs:
+  - id: baseline_series
+    description: 含时间列、基准模拟列、观测列（train 必填）与候选特征列的表格，通常来自模型运行与观测对齐结果。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: base
+        semantics: 基准模拟序列，列名由 --base-column 给出；必须是已确认单位的流量序列。
+        units: m3/s as confirmed
+        time_step: 由上游契约声明，本 Skill 不换算
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测默认停止；使用 drop-rows 时必须记录丢弃行数。
+      - name: observed
+        semantics: 同期观测序列，列名由 --observed-column 给出，用于构造残差 observed - base。
+        units: m3/s as confirmed
+        time_step: 由上游契约声明，本 Skill 不换算
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测默认停止；使用 drop-rows 时必须记录丢弃行数。
+      - name: residual
+        semantics: 由本 Skill 计算的残差，定义为 observed - base；不作为输入接受相反符号约定。
+        units: m3/s
+        time_step: 与输入一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 由构造过程产生，不得手工替换。
+  - id: model_configuration
+    description: 后端名称、显式超参、随机种子、划分方式与滞后特征配置。
+    required: true
+    format: CLI arguments and JSON
+    variables:
+      - name: feature_columns
+        semantics: 参与训练与预测的特征列清单，必须显式列出，不自动推断。
+        units: column names
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失列必须停止。
+      - name: lag_spec
+        semantics: 滞后特征定义，步数必须为非负整数，禁止使用未来时刻的值。
+        units: steps
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 负步数必须停止。
+outputs:
+  - id: corrected_series
+    description: 含基准列、观测列（若有）、残差、预测残差与校正列的逐时步表。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: corrected
+        semantics: 校正后的序列，等于 base + predicted_residual；负值不裁剪并计数。
+        units: m3/s
+        time_step: 与输入一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: predicted_residual
+        semantics: 模型预测的残差，符号与 observed - base 一致。
+        units: m3/s
+        time_step: 与输入一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 出现非有限值即失败，退出码 2。
+  - id: model_card
+    description: 模型卡，记录后端、超参、随机种子、划分方式、特征列、滞后配置、残差定义与训练/测试指标。
+    required: false
+    format: JSON
+  - id: model_artifact
+    description: 序列化模型文件，与模型卡配对保存，predict 模式按模型卡校验特征与滞后配置。
+    required: false
+    format: joblib
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+simulation_period:
+  required: true
+  semantics: 输入表覆盖的全部时步；滞后构造或缺测处理会减少可用行，减少数量必须写入 result.json。
+invariants:
+  - 残差定义必须为 observed - base，回代必须为 base + predicted_residual。
+  - 滞后步数必须为非负整数，禁止引入未来信息。
+  - 训练必须给出 random_state，否则拒绝执行。
+  - 输入缺测默认停止；滞后构造造成的不完整行只能丢弃或显式填充，不得静默填 0。
+  - 预测残差必须全部有限，出现非有限值即退出码 2。
+  - 输出只写入 --output-dir，模型文件必须位于输出目录内。

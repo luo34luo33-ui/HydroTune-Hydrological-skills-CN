@@ -1,0 +1,35 @@
+schema_version: "1.0"
+skill: data-processing/extract-flood-events
+inputs:
+  - id: baseflow_result
+    description: separate-baseflow-eckhardt 生成且哈希可验证的 result.json。
+    required: true
+    format: JSON
+  - id: event_config
+    description: 通过 flood-event-config schema 的完整显式参数配置。
+    required: true
+    format: YAML
+outputs:
+  - id: event_summary
+    description: 每个事件的边界、洪峰、历时、洪量和分量比例。
+    required: true
+    format: CSV, Parquet or XLSX sheet
+  - id: event_process
+    description: 含显式 warm-up 标记的逐事件长表。
+    required: true
+    format: CSV, Parquet or XLSX sheet
+  - id: annotated_series
+    description: 带最终 event_id 的完整连续流量分量序列。
+    required: true
+    format: CSV, Parquet or XLSX sheet
+  - id: run_result
+    description: 运行状态、参数、QC 与文件哈希。
+    required: true
+    format: JSON
+warmup_period:
+  required: false
+  semantics: 按配置步数在事件起点前导出，仅用于上下文，不参与事件指标。
+invariants:
+  - 事件 ID 唯一、按时间稳定排序且 start 不晚于 peak、peak 不晚于 end。
+  - 最终事件不得重叠，warm-up 不得进入事件指标。
+  - 总洪量必须在数值容差内等于基流洪量加直接径流洪量。

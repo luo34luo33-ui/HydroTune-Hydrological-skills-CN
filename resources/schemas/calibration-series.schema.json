@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.local/schemas/calibration-series.schema.json",
+  "title": "Logical schema for a calibration series table",
+  "type": "object",
+  "required": ["data_shape", "required_columns"],
+  "properties": {
+    "data_shape": {"enum": ["continuous", "event_collection"]},
+    "required_columns": {"type": "array", "allOf": [{"contains": {"const": "observed"}}, {"contains": {"const": "simulated"}}, {"contains": {"const": "scored"}}]},
+    "optional_columns": {"type": "array", "items": {"type": "string"}}
+  }
+}

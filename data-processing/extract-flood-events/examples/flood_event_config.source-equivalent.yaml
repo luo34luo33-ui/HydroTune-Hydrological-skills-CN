@@ -1,0 +1,18 @@
+schema_version: "1.0"
+peak_detection:
+  peak_quantile: 0.90
+  prominence_factor: 0.25
+  min_peak_distance_hours: 24
+boundaries:
+  boundary_fraction: 0.05
+  boundary_persistence_steps: 3
+  max_search_days: 20
+merging:
+  merge_gap_hours: 24
+  valley_ratio_threshold: 0.60
+filters:
+  min_event_duration_hours: 1
+  min_peak_flow_m3_s: 300
+  min_event_volume_m3: 25000000
+warmup:
+  steps: 72

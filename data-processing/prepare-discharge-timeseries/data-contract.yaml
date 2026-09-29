@@ -1,0 +1,31 @@
+schema_version: "1.0"
+skill: data-processing/prepare-discharge-timeseries
+inputs:
+  - id: source_timeseries
+    description: 包含已确认时间列和流量列的 XLSX、CSV 或 Parquet 文件。
+    required: true
+    format: XLSX, CSV or Parquet
+    variables:
+      - name: source_discharge
+        semantics: 用户明确指定的连续流量观测列。
+        units: m3/s, L/s or cfs as confirmed
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测不得静默外推；修复行为必须显式选择并标记。
+outputs:
+  - id: discharge_timeseries
+    description: 包含 time、discharge_m3_s、is_imputed 和保留附加列的标准表。
+    required: true
+    format: CSV, Parquet or XLSX
+  - id: series_metadata
+    description: 单位、时区、时间步长、列映射和处理证据。
+    required: true
+    format: JSON
+  - id: run_result
+    description: 符合 data-processing-run-result schema 的运行结果。
+    required: true
+    format: JSON
+invariants:
+  - 标准流量单位必须为 m3/s，时间必须严格递增且规则。
+  - 首尾缺测不得外推，内部插值必须显式授权并标记。
+  - 未确认附加列不得根据名称赋予水文语义。

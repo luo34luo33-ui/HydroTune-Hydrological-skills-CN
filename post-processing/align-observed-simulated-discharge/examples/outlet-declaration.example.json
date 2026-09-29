@@ -1,0 +1,1 @@
+{"location":"basin_outlet","outlet_id":"BASIN-OUTLET","unit":"m3/s","input_unit":"m3/s","inflow_sha256":"SHA256_OF_ROUTED_INPUT_TABLE","column":"Q_total","upstream_xaj_result":"/path/to/xaj/result.json"}

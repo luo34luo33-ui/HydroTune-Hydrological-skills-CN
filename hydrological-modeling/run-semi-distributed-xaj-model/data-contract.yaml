@@ -1,0 +1,97 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-semi-distributed-xaj-model
+inputs:
+  - id: topology_result
+    description: build-hydrological-topology 的 result.json，引用带 SHA-256 的子流域、河段和拓扑表。
+    required: true
+    format: JSON
+  - id: topology_qc_result
+    description: validate-hydrological-topology 的 result.json，必须引用同一构建结果且 expected_outlets 为 1。
+    required: true
+    format: JSON
+  - id: forcing
+    description: 每个 time/sub_id 恰好一行的逐步降雨和蒸发能力长表。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: P_mm
+        semantics: 对应子流域和时间间隔的累计降雨深度。
+        units: mm/step
+        spatial_unit: subbasin
+        time_step: config.time.step_seconds 显式指定
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 不允许缺失、重复或隐式填零。
+      - name: E0_mm
+        semantics: 对应子流域和时间间隔的累计蒸发能力深度。
+        units: mm/step
+        spatial_unit: subbasin
+        time_step: config.time.step_seconds 显式指定
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 不允许缺失、重复或隐式填零。
+      - name: time
+        semantics: 带 UTC 偏移的区间末端时间戳。
+        units: datetime
+        time_step: config.time.step_seconds 显式指定
+        timezone: config.time.timezone 显式指定
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失或重复。
+  - id: parameter_set
+    description: 全域共享 XAJ 参数、逐河段 DP、初始状态、时间与模拟期间的完整配置。
+    required: true
+    format: JSON or YAML
+  - id: boundary_inflow
+    description: 可选 time/reach_id/Q_m3s 长表；提供时每行在对应河段 Muskingum 前注入地表流。未提供表示无外部入流。
+    required: false
+    format: UTF-8 CSV
+    variables:
+      - name: Q_m3s
+        semantics: 指定河段在区间末端的外部边界入流率。
+        units: m3/s
+        spatial_unit: reach
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 提供的行不允许缺失；未列出的时段/河段视为无入流。
+outputs:
+  - id: subbasin_process
+    description: 每个子流域逐时步土壤状态、三水源深度及本地入河流量。
+    required: true
+    format: UTF-8 CSV
+  - id: reach_process
+    description: 每个河段逐时步三水源入流、出流和边界入流。
+    required: true
+    format: UTF-8 CSV
+  - id: outlet_flow
+    description: 唯一流域出口的逐时步三水源与总流量，含 is_warmup 标记。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: Q_m3s
+        semantics: 拓扑驱动后的唯一出口总流量。
+        units: m3/s
+        spatial_unit: outlet_reach
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 科学 QC 失败时不生成有效模拟序列。
+  - id: model_config
+    description: 运行时完整配置快照。
+    required: true
+    format: JSON
+  - id: run_result
+    description: 参数、输入输出哈希、QC、记账量与 provenance。
+    required: true
+    format: JSON
+warmup_period:
+  required: true
+  semantics: config.warmup_steps 指定前 N 个时步；保留在输出并标记，不属于模拟期间。
+simulation_period:
+  required: true
+  semantics: config.simulation.start/end 必须等于预热后首步和序列末步，均为带偏移区间末端时间。
+invariants:
+  - 每个子流域面积只用于一次局地产流，且必须来自经验证 HydroBase。
+  - 每个子流域恰有一个本地出口河段，整个流域恰有一个最终出口。
+  - 每个 time/sub_id 恰有一条 forcing，时间轴严格等间隔。
+  - 参数、状态、输入和输出均有限；缺失或非法数值不静默修复。
+  - 上游三水源按 DAG 顺序进入下游同名通道，外部入流仅进入地表流通道。

@@ -1,0 +1,28 @@
+schema_version: "1.0"
+skill: model-calibration/calibrate-model-de
+inputs:
+  - id: calibration_problem
+    description: 含评估器哈希、参数边界、目标方向、split 与变量语义的 JSON。
+    required: true
+    format: JSON
+  - id: optimizer_config
+    description: 含 seed、预算与完整 DE 参数的 JSON。
+    required: true
+    format: JSON
+outputs:
+  - id: calibrated_parameters
+    description: 最优参数、边界、归一化位置和触边状态。
+    required: true
+    format: JSON
+  - id: calibration_evidence
+    description: 搜索轨迹、率定与验证指标和标准观测模拟序列。
+    required: true
+    format: CSV and JSON
+  - id: run_result
+    description: 状态、哈希、QC、warning 与 provenance。
+    required: true
+    format: JSON
+invariants:
+  - validation 不得参与搜索或参数选择。
+  - 所有目标评估均计入显式预算。
+  - 输出参数必须位于显式边界内。

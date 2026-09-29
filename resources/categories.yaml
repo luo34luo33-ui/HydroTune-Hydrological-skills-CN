@@ -1,0 +1,97 @@
+schema_version: "1.0"
+categories:
+  - id: data-processing
+    title_zh: 数据处理
+    description: 水文气象时序、数据清洗、时间对齐、洪水事件识别、格式与语义处理。
+    includes:
+      - 原始水文与气象数据读取和质量检查
+      - 时间轴、单位、缺测值和异常值处理
+      - 降雨与洪水事件识别及基础事件属性
+    excludes:
+      - 模拟输出的二次加工
+      - 模型误差原因诊断
+    overlaps:
+      - post-processing
+      - evaluation-diagnostics
+  - id: spatial-analysis
+    title_zh: 空间分析
+    description: DEM、流域、子流域、河网、站点、上下游拓扑和空间映射。
+    includes:
+      - 水文空间数据预处理
+      - 河网、子流域、站点和模型单元拓扑
+      - 坐标参考系与空间连接关系检查
+    excludes:
+      - 水文模型产汇流计算
+      - 仅用于展示的制图排版
+    overlaps:
+      - hydrological-modeling
+      - visualization-reporting
+  - id: hydrological-modeling
+    title_zh: 水文建模
+    description: 集总式与半分布式模型结构、产汇流过程、状态初始化和模型运行。
+    includes:
+      - 建模空间结构和模型类型选择
+      - 模型状态、参数体系、warm-up 和前向模拟
+      - 子流域局地产流与拓扑汇流组织
+    excludes:
+      - 参数搜索与目标函数优化
+      - 完全分布式、水动力和地下水模型
+    overlaps:
+      - spatial-analysis
+      - model-calibration
+  - id: model-calibration
+    title_zh: 模型率定
+    description: 参数优化、目标函数、参数边界、率定策略、验证和可辨识性。
+    includes:
+      - 参数空间、目标函数和优化器选择
+      - 率定与验证数据划分
+      - 参数可辨识性、敏感性和不确定性证据
+    excludes:
+      - 未经优化的前向模拟
+      - 仅对最终结果进行性能解释
+    overlaps:
+      - hydrological-modeling
+      - evaluation-diagnostics
+  - id: post-processing
+    title_zh: 后处理
+    description: 模拟输出整理、事件提取、统计聚合、派生变量和时空结果加工。
+    includes:
+      - 模拟结果格式标准化
+      - 模拟后事件切片、统计聚合和派生变量
+      - 面向评价、可视化和报告的数据准备
+    excludes:
+      - 原始观测数据的首次整理
+      - 对误差模式作水文原因解释
+    overlaps:
+      - data-processing
+      - evaluation-diagnostics
+      - visualization-reporting
+  - id: evaluation-diagnostics
+    title_zh: 评价诊断
+    description: 指标评价、洪水诊断、误差模式、过程诊断和有证据的问题归因。
+    includes:
+      - 整体、事件、流量分区、季节和水量平衡评价
+      - 观测与模拟差异的模式识别
+      - 证据约束的水文假设和下一步分析建议
+    excludes:
+      - 无证据的因果结论
+      - 单纯的图表绘制和报告排版
+    overlaps:
+      - data-processing
+      - model-calibration
+      - post-processing
+      - visualization-reporting
+  - id: visualization-reporting
+    title_zh: 可视化与报告
+    description: 水文图件、诊断图、空间图、表格、自动报告和结果表达。
+    includes:
+      - 时序、事件、空间和诊断图表
+      - 表格和结构化报告输出
+      - 证据、推断与限制的清晰表达
+    excludes:
+      - 产生指标或诊断证据的核心计算
+      - 为展示效果改写科学结论
+    overlaps:
+      - spatial-analysis
+      - post-processing
+      - evaluation-diagnostics

@@ -1,0 +1,39 @@
+schema_version: "1.0"
+skill: post-processing/align-observed-simulated-discharge
+inputs:
+  - id: observed_result
+    description: prepare-discharge-timeseries 的 result.json。
+    required: true
+    format: JSON
+  - id: simulation_result
+    description: 模型或河道汇流的 result.json；逐场次可用 event manifest。
+    required: false
+    format: JSON
+  - id: outlet_declaration
+    description: 路由结果的流域出口位置、m3/s 单位和列名。
+    required: false
+    format: JSON
+outputs:
+  - id: aligned
+    description: 含预热与未匹配标记的并列表。
+    required: true
+    format: CSV
+  - id: evaluation
+    description: 排除预热且精确匹配的观测—模拟表。
+    required: true
+    format: CSV
+  - id: excluded_observations
+    description: 未落入模拟时段的观测及剔除原因。
+    required: true
+    format: CSV
+  - id: qc
+    description: 匹配与剔除数量。
+    required: true
+    format: JSON
+  - id: result
+    description: 输入产物哈希与 QC。
+    required: true
+    format: JSON
+invariants:
+  - XAJ Qt 不能视为流域出口流量。
+  - 预热行不可进入评价表。

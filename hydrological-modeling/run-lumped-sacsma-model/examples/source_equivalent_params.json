@@ -1,0 +1,19 @@
+{
+  "_note": "SAC-SMA 演示示例参数，仅用于跑通 CLI 与测试；上游 KMarkert/sacsma 的 land_surface.py 未定义任何参数范围或默认值，本文件数值是量级合理的演示值，不是率定值，更不是通用水文默认值。时间步长建议 24 小时（源码为日水量核算）；非日步长仅记 WARN 不换算。运行时还必须显式提供 --area-km2 与 --timestep-hours（源码输出为 mm，无面积换算）。ADIMP + PCTIM 必须小于 1。",
+  "UZTWM": 150.0,
+  "UZFWM": 50.0,
+  "LZTWM": 800.0,
+  "LZFPM": 800.0,
+  "LZFSM": 200.0,
+  "ADIMP": 0.1,
+  "UZK": 0.2,
+  "LZPK": 0.01,
+  "LZSK": 0.3,
+  "ZPERC": 20.0,
+  "REXP": 1.5,
+  "PCTIM": 0.02,
+  "PFREE": 0.3,
+  "RIVA": 0.0,
+  "SIDE": 0.0,
+  "RSERV": 0.3
+}

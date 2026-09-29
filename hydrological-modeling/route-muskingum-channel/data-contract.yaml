@@ -1,0 +1,69 @@
+schema_version: "1.0"
+skill: hydrological-modeling/route-muskingum-channel
+inputs:
+  - id: inflow_table
+    description: 含时间列与一条或多条入流列的表格，例如新安江输出的 Qt 与上游水库出库 Qres_in。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: inflow
+        semantics: 待演进的入流序列，列名由 --route-spec 显式声明；单位必须已由上游确认。
+        units: m3/s
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止，不得静默填 0 或插值。
+      - name: time
+        semantics: 严格递增且等间隔的时间索引。
+        units: datetime
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 空值或重复值必须停止。
+  - id: route_spec
+    description: 路由配置，逐条声明入流列、布局、K、X、串联级数、初始出流与输出级选择。
+    required: true
+    format: JSON or YAML
+    variables:
+      - name: K
+        semantics: 马斯京根槽蓄时间常数，单河段布局下使用；串联布局的等效 K 等于时间步长。
+        units: h
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止，不得使用经验默认值。
+      - name: X
+        semantics: 马斯京根权重因子，串联布局下参与 x_l = 0.5 - n(1-2X)/2 的计算。
+        units: dimensionless
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止，不得使用经验默认值。
+outputs:
+  - id: routed_table
+    description: 逐时步出流表，每条路由一列 routed_<id>，多源合并时增加合并列。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: routed_outflow
+        semantics: 演进后的出流序列，负值已按源码行为裁剪到 0。
+        units: m3/s
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+  - id: route_coefficients
+    description: 每条路由的系数、等效 X、初始出流来源与负值计数，用于审计与复现。
+    required: true
+    format: JSON
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+simulation_period:
+  required: true
+  semantics: 入流表覆盖的全部时步；时间轴不等间隔或存在缺测即停止，退出码 2。
+invariants:
+  - C0 + C1 + C2 必须等于 1，偏差不得超过 1e-9。
+  - 时间轴必须严格递增、等间隔，并与 --timestep-hours 一致。
+  - 入流缺测或参数缺失即停止，不静默填充也不静默复用旧结果。
+  - 出流必须全部有限；负值按源码行为裁剪到 0 并计数，不得静默忽略。
+  - 输出只写入 --output-dir，演进体积差不作失败判定，只以 warning 记录。

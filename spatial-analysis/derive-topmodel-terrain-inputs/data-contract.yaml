@@ -1,0 +1,18 @@
+schema_version: "1.0"
+skill: spatial-analysis/derive-topmodel-terrain-inputs
+inputs:
+  - {id: stream_result, required: true, format: JSON, description: Hashed stream extraction result with filled DEM D8 and accumulation raster.}
+  - {id: topology_result, required: true, format: JSON, description: Hashed HydroBase result with true basin raster.}
+  - {id: topology_qc_result, required: true, format: JSON, description: Matching independent single outlet topology QC with no FAIL.}
+  - {id: classes, required: true, format: integer, description: Explicit topographic index class count at least two.}
+  - {id: distance_bins, required: true, format: integer, description: Explicit distance area bin count at least one.}
+  - {id: minimum_slope, required: true, format: number, description: Explicit positive dimensionless D8 slope floor.}
+outputs:
+  - {id: topographic_index, required: true, format: GeoTIFF, description: Natural log of specific catchment area over D8 slope.}
+  - {id: topographic_index_classes, required: true, format: CSV, description: Mean topographic index and basin area fraction per class.}
+  - {id: distance_area, required: true, format: CSV, description: D8 outlet distance and cumulative basin area.}
+  - {id: run_result, required: true, format: JSON, description: Input and output hashes clipped slope count and QC.}
+invariants:
+  - Each true-basin cell follows D8 to the sole outlet.
+  - Area fractions sum to one; final cumulative area equals basin area.
+  - All input artifacts and upstream result hashes match before calculation.

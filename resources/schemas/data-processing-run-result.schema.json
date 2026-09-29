@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.dev/schemas/data-processing-run-result.schema.json",
+  "title": "HydroTune data-processing run result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "skill", "status", "message", "parameters", "inputs", "artifacts", "checks", "warnings", "provenance"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "skill": {"type": "string", "pattern": "^data-processing/[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "status": {"enum": ["success", "warning", "error"]},
+    "message": {"type": "string", "minLength": 1},
+    "parameters": {"type": "object"},
+    "inputs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/fileReference"}},
+    "artifacts": {"type": "object", "additionalProperties": {"$ref": "#/$defs/fileReference"}},
+    "checks": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["check", "status", "details"], "properties": {"check": {"type": "string", "minLength": 1}, "status": {"enum": ["PASS", "WARN", "FAIL"]}, "details": {"type": "string"}}}},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "provenance": {"type": "object"}
+  },
+  "$defs": {"fileReference": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}}
+}

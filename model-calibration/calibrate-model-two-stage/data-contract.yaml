@@ -1,0 +1,13 @@
+schema_version: "1.0"
+skill: model-calibration/calibrate-model-two-stage
+inputs:
+  - {id: calibration_problem, description: 含评估器、参数、目标、split 和变量语义的 JSON。, required: true, format: JSON}
+  - {id: optimizer_config, description: 含 seed、总预算和两阶段完整参数的 JSON。, required: true, format: JSON}
+outputs:
+  - {id: calibrated_parameters, description: 两阶段中的最佳参数及边界证据。, required: true, format: JSON}
+  - {id: calibration_evidence, description: 分阶段轨迹、两 split 指标和标准序列。, required: true, format: CSV and JSON}
+  - {id: run_result, description: 状态、哈希、QC 与 provenance。, required: true, format: JSON}
+invariants:
+  - 两阶段评估预算之和不得超过总预算。
+  - validation 不得参与全局或局部搜索。
+  - 最终参数必须是两个阶段中最佳的可行参数。

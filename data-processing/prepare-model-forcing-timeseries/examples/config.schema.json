@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "variable", "columns", "unit", "value_semantics", "timezone", "source_timezone_mode", "timestamp_semantics", "timestep_seconds"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "variable": {"enum": ["P", "PET", "E0"]},
+    "columns": {"type": "object", "additionalProperties": false,
+      "required": ["time", "source_id", "value"],
+      "properties": {"time": {"type": "string"}, "source_id": {"type": "string"},
+        "value": {"type": "string"}, "reset": {"type": "string"}}},
+    "unit": {"enum": ["mm/step", "m/step", "mm/h", "mm/day"]},
+    "value_semantics": {"enum": ["step_depth", "rate", "running_cumulative"]},
+    "timezone": {"type": "string", "minLength": 1},
+    "source_timezone_mode": {"enum": ["aware", "local_naive"]},
+    "timestamp_semantics": {"enum": ["interval_start", "interval_end"]},
+    "timestep_seconds": {"type": "integer", "minimum": 1}
+  }
+}

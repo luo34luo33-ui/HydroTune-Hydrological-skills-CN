@@ -1,0 +1,31 @@
+schema_version: "1.0"
+skill: spatial-analysis/aggregate-forcing-to-model-units
+inputs:
+  - id: hydrobase
+    description: 构建 result.json 和单出口独立 QC result.json，哈希一致。
+    required: true
+    format: JSON
+  - id: source_config
+    description: P 与 evap 两层的来源、空间坐标、时间及单位。
+    required: true
+    format: JSON
+outputs:
+  - id: forcing
+    description: 流域 time,P,PET 或子流域 time,sub_id,P_mm,E0_mm。
+    required: true
+    format: CSV
+  - id: weights
+    description: 逐变量、逐模型单元、逐站点/格点面积权重。
+    required: true
+    format: CSV
+  - id: coverage
+    description: 逐变量与模型单元覆盖比例。
+    required: true
+    format: CSV
+  - id: result
+    description: 逐输入与产物哈希及 QC。
+    required: true
+    format: JSON
+invariants:
+  - HydroBase QC 必须无 FAIL，且构建哈希吻合。
+  - 逐步缺站或缺格点停止，不调整面积权重。

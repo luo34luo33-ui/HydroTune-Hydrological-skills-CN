@@ -1,0 +1,1 @@
+{"min_coverage_fraction":0.999999,"layers":{"P":{"kind":"station","variable":"P","result":"/path/to/rain/result.json","stations":"/path/to/stations.csv","station_crs":"EPSG:4326"},"evap":{"kind":"station","variable":"PET","result":"/path/to/evap/result.json","stations":"/path/to/stations.csv","station_crs":"EPSG:4326"}}}

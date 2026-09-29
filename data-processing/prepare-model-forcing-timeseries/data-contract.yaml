@@ -1,0 +1,27 @@
+schema_version: "1.0"
+skill: data-processing/prepare-model-forcing-timeseries
+inputs:
+  - id: source
+    description: 带站点 ID、时间和值的本地 CSV、XLSX 或 Parquet。
+    required: true
+    format: CSV, XLSX or Parquet
+  - id: config
+    description: 显式变量、列、单位、时间步长、时区、时间戳与原始值语义。
+    required: true
+    format: JSON
+outputs:
+  - id: forcing
+    description: time,source_id,variable,depth_mm；区间末端且 mm/步。
+    required: true
+    format: CSV
+  - id: metadata
+    description: 时间与变量语义。
+    required: true
+    format: JSON
+  - id: result
+    description: 输入产物哈希与 QC。
+    required: true
+    format: JSON
+invariants:
+  - 每站时序规则完整，站间时间轴一致。
+  - 不从 ETo 隐式转换 PET 或 E0。

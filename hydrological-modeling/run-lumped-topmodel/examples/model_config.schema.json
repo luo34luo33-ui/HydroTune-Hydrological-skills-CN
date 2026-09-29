@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TOPMODEL continuous run configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestep_hours", "timezone", "timestamp_semantics", "forcing_unit", "warmup_steps", "simulation_start", "simulation_end", "water_balance_tolerance_m", "parameters"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "timestep_hours": {"type": "number", "exclusiveMinimum": 0},
+    "timezone": {"type": "string", "minLength": 1},
+    "timestamp_semantics": {"const": "interval_end"},
+    "forcing_unit": {"const": "mm/step"},
+    "warmup_steps": {"type": "integer", "minimum": 0},
+    "simulation_start": {"type": "string", "format": "date-time"},
+    "simulation_end": {"type": "string", "format": "date-time"},
+    "water_balance_tolerance_m": {"type": "number", "exclusiveMinimum": 0},
+    "parameters": {
+      "type": "object", "additionalProperties": false,
+      "required": ["qs0", "lnTe", "m", "Sr0", "Srmax", "td", "vch", "vr", "infiltration_excess"],
+      "properties": {
+        "qs0": {"type": "number", "exclusiveMinimum": 0},
+        "lnTe": {"type": "number"},
+        "m": {"type": "number", "exclusiveMinimum": 0},
+        "Sr0": {"type": "number", "minimum": 0},
+        "Srmax": {"type": "number", "exclusiveMinimum": 0},
+        "td": {"type": "number"},
+        "vch": {"type": "number", "exclusiveMinimum": 0},
+        "vr": {"type": "number", "exclusiveMinimum": 0},
+        "infiltration_excess": {"type": "boolean"},
+        "K0": {"type": "number", "exclusiveMinimum": 0},
+        "psi": {"type": "number", "minimum": 0},
+        "dtheta": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+      }
+    }
+  }
+}

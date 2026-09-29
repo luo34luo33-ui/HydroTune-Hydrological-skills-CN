@@ -1,0 +1,7 @@
+{
+  "_note": "Lohmann 路由演示示例参数，仅用于跑通 CLI 与测试；上游 KMarkert/sacsma 的 routing.py 未定义任何参数范围或默认值，本文件数值是量级合理的演示值（N/K 为 Gamma UH 形状与尺度（天），VELO 波速 m/s，DIFF 扩散系数 m2/s），不是率定值。河长 --flowlen-m 从 CLI 显式提供；0 表示河道 UH 退化为脉冲。运行时还必须显式提供 --timestep-hours（建议 24 小时，UH 为日尺度）。",
+  "N": 2.0,
+  "K": 2.0,
+  "VELO": 1.0,
+  "DIFF": 800.0
+}

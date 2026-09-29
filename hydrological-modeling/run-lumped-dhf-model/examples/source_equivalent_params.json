@@ -1,0 +1,21 @@
+{
+  "_note": "源码等价示例参数，仅用于复现 hydromodel/scripts/run_dhf_simulation.py 中 get_dhf_default_parameters() 的内置测试参数；它们不是率定值，更不是通用水文默认值。规范键名 KC 对应源脚本的 K；运行时还必须显式提供 --river-length-km、--area-km2 与 --timestep-hours（源码硬编码的大伙房值 155.763 km 与 5482.0 km2 不作为默认值）。",
+  "S0": 50.0,
+  "U0": 100.0,
+  "D0": 80.0,
+  "KC": 0.8,
+  "KW": 0.5,
+  "K2": 0.3,
+  "KA": 0.7,
+  "G": 0.2,
+  "A": 0.4,
+  "B": 0.6,
+  "B0": 1.5,
+  "K0": 0.5,
+  "N": 2.0,
+  "DD": 1.2,
+  "CC": 0.8,
+  "COE": 0.6,
+  "DDL": 1.0,
+  "CCL": 0.7
+}

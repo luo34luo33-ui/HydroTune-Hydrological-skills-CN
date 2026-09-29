@@ -1,0 +1,42 @@
+schema_version: "1.0"
+skill: spatial-analysis/extract-dem-stream-network
+inputs:
+  - id: analysis_dem
+    description: 米制投影、米制高程、正像元面积的 buffer 分析 DEM。
+    required: true
+    format: GeoTIFF
+    variables:
+      - name: elevation
+        semantics: 用于填洼和 D8 流向计算的地表高程。
+        units: m
+        coordinate_reference_system: 必须为米制投影 CRS
+        spatial_unit: raster cell
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: NoData 不参与水文运算。
+outputs:
+  - id: filled_dem
+    description: WhiteboxTools 填洼后的 DEM。
+    required: true
+    format: GeoTIFF
+  - id: d8_pointer
+    description: Whitebox 非 ESRI 编码的 D8 流向栅格。
+    required: true
+    format: GeoTIFF
+  - id: flow_accumulation
+    description: 以汇入像元数表示的 D8 汇流累积。
+    required: true
+    format: GeoTIFF
+  - id: stream_products
+    description: 河网、河段编号、Strahler、子流域栅格和河网矢量集合。
+    required: true
+    format: GeoTIFF and GeoPackage
+  - id: run_result
+    description: 包含阈值换算、D8 编码、版本和哈希的运行结果。
+    required: true
+    format: JSON
+invariants:
+  - 所有核心栅格的 CRS、仿射变换、行列数和像元网格必须一致。
+  - D8 编码必须为 Whitebox 默认非 ESRI 编码。
+  - 面积阈值必须大于零并记录对应的像元阈值。
+  - 至少必须提取一个正编号河段，阈值不得被自动修改。

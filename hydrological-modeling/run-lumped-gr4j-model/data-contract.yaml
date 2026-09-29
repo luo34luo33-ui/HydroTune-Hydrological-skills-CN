@@ -1,0 +1,112 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-lumped-gr4j-model
+inputs:
+  - id: forcing_table
+    description: 包含时间、面平均降雨与蒸发能力的 forcing 表；event 模式下可由一个目录或一个多 sheet 工作簿提供多场次。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: P
+        semantics: 面平均降雨，每步长水深；由调用方确认为面平均值。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止；不得静默填 0 或插值后继续。
+      - name: PET
+        semantics: 蒸发能力，每步长水深，与降雨同量纲相减进入 tanh 产流分支。
+        units: mm per time step
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺测必须停止；来源与处理方法由调用方记录。
+      - name: time
+        semantics: 严格递增且等间隔的时间索引。
+        units: datetime
+        time_step: 由 --timestep-hours 显式声明并与时间列推断值一致
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 空值或重复值必须停止。
+  - id: parameter_set
+    description: GR4J 4 参数集（X1/X2/X3/X4），全部必填；源码无参数范围定义，本 Skill 不引入外部先验。
+    required: true
+    format: JSON or YAML
+    variables:
+      - name: X1
+        semantics: 产流水库容量，tanh 产流分支与 percolation 的尺度参数。
+        units: mm
+        state_or_flux: state
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止；源码行为即 KeyError。
+      - name: X2
+        semantics: 地下水交换系数，可为负；负值表示外部汇入（GR4J 标准语义）。
+        units: mm
+        state_or_flux: flux
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失必须停止；源码行为即 KeyError。
+      - name: X4
+        semantics: 单位线历时，以步为单位；决定 UH1/UH2 长度（ceil(X4) 与 ceil(2·X4)）。
+        units: steps
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 缺失或非正必须停止。
+  - id: basin_properties
+    description: 流域属性，由 CLI 显式提供：--area-km2（流域面积，用于 mm→m3/s 换算）、--timestep-hours（时间步长）。
+    required: true
+    format: CLI arguments
+outputs:
+  - id: simulation_table
+    description: 逐时步状态与通量表，含源码等价 Q_MM（mm/步）与换算后 Q（m3/s）及产流分量、状态列；event 模式带场次标识列。
+    required: true
+    format: CSV, Parquet or XLSX
+    variables:
+      - name: Q_MM
+        semantics: 源码等价的出口流量（mm per step），与 gr4j() 返回值逐位一致，用作等价锚点。
+        units: mm per time step
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: Q
+        semantics: 流域出口流量，Q_MM 乘以面积与步长换算系数。
+        units: m3/s
+        time_step: 与输入时间步长一致
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: PROD_STORE
+        semantics: 产流水库蓄水状态，tanh 公式自限、非负。
+        units: mm
+        time_step: 与输入时间步长一致
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+      - name: ROUT_STORE
+        semantics: 汇流水库蓄水状态，经 floor 0 与非线性出流更新，非负。
+        units: mm
+        time_step: 与输入时间步长一致
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: QC 失败时不产出；不写 NaN。
+  - id: event_index
+    description: event 模式下的场次清单，记录每场的行数、起止时间与预热步数。
+    required: false
+    format: CSV
+  - id: run_result
+    description: 符合 HydroTune 运行结果约定的 result.json，含参数、输入与产物 SHA-256、QC 与 provenance。
+    required: true
+    format: JSON
+warmup_period:
+  required: false
+  semantics: 由 --warmup-steps 显式声明的前 N 步标记 is_warmup 且不纳入模拟期统计；源码没有 warmup 机制，标记段照常递推。
+simulation_period:
+  required: true
+  semantics: 扣除预热后的全部时步；模拟期为空即失败，退出码 2。
+invariants:
+  - 时间轴必须严格递增、等间隔，并与 --timestep-hours 一致。
+  - 水库状态 PROD_STORE、ROUT_STORE 必须非负（tanh 公式自限与 floor 0 兜底）。
+  - 状态与通量必须全部有限，出现 NaN 或 Inf 即失败。
+  - Q_MM 必须与源码 gr4j() 输出逐位一致，Q 由显式面积与步长换算。
+  - X2 允许为负（外部汇入），不作为校验失败条件。
+  - 水量平衡残差以 warning 报告：地下水交换与 percolation 分流使闭合为近似，不作失败判定。
+  - 输出只写入 --output-dir，forcing 缺测或参数越界即停止，不静默填充也不静默复用旧结果。

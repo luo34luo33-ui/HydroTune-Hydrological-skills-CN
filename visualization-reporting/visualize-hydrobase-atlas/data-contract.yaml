@@ -1,0 +1,25 @@
+schema_version: "1.0"
+skill: visualization-reporting/visualize-hydrobase-atlas
+inputs:
+  - id: build_result
+    description: build-hydrological-topology 生成且 artifacts 哈希可验证的 result.json。
+    required: true
+    format: JSON
+  - id: validation_result
+    description: validate-hydrological-topology 生成且包含 QC artifacts 的 result.json。
+    required: true
+    format: JSON
+outputs:
+  - id: atlas_figures
+    description: 允许生成的固定模板对应 PNG、SVG 和 figure.json。
+    required: true
+    format: PNG, SVG and JSON
+  - id: run_result
+    description: 符合 visualization-run-result schema 的总运行结果。
+    required: true
+    format: JSON
+invariants:
+  - PNG 必须精确为 2400×1600 像素，SVG 与 PNG 使用相同布局。
+  - build 和 validation 中所有被使用 artifact 必须先通过 SHA-256 检查。
+  - 科学 QC FAIL 时只能生成失败 dashboard，且运行退出码必须为 2。
+  - 图册不得重新计算水文指标、拓扑检查或失败原因。

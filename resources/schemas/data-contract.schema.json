@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.dev/schemas/data-contract.schema.json",
+  "title": "HydroTune atomic skill data contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "skill", "inputs", "outputs", "invariants"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "skill": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "inputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "warmup_period": { "$ref": "#/$defs/period" },
+    "simulation_period": { "$ref": "#/$defs/period" },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "semantics"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "semantics": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "required"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "description": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "format": { "type": "string", "minLength": 1 },
+        "variables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/variable" }
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "semantics", "units", "missing_value_semantics"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "semantics": { "type": "string", "minLength": 1 },
+        "units": { "type": "string", "minLength": 1 },
+        "time_step": { "type": "string", "minLength": 1 },
+        "timezone": { "type": "string", "minLength": 1 },
+        "calendar": { "type": "string", "minLength": 1 },
+        "coordinate_reference_system": { "type": "string", "minLength": 1 },
+        "catchment_area": { "type": "string", "minLength": 1 },
+        "spatial_unit": { "type": "string", "minLength": 1 },
+        "state_or_flux": { "enum": ["state", "flux", "not_applicable"] },
+        "accumulated_or_instantaneous": { "enum": ["accumulated", "instantaneous", "not_applicable"] },
+        "missing_value_semantics": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
+

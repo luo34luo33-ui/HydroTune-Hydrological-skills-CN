@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.dev/schemas/flood-event-config.schema.json",
+  "title": "HydroTune flood event extraction configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "peak_detection", "boundaries", "merging", "filters", "warmup"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "peak_detection": {"type": "object", "additionalProperties": false, "required": ["peak_quantile", "prominence_factor", "min_peak_distance_hours"], "properties": {"peak_quantile": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}, "prominence_factor": {"type": "number", "minimum": 0}, "min_peak_distance_hours": {"type": "number", "exclusiveMinimum": 0}}},
+    "boundaries": {"type": "object", "additionalProperties": false, "required": ["boundary_fraction", "boundary_persistence_steps", "max_search_days"], "properties": {"boundary_fraction": {"type": "number", "minimum": 0, "maximum": 1}, "boundary_persistence_steps": {"type": "integer", "minimum": 1}, "max_search_days": {"type": "number", "exclusiveMinimum": 0}}},
+    "merging": {"type": "object", "additionalProperties": false, "required": ["merge_gap_hours", "valley_ratio_threshold"], "properties": {"merge_gap_hours": {"type": "number", "minimum": 0}, "valley_ratio_threshold": {"type": "number", "minimum": 0, "maximum": 1}}},
+    "filters": {"type": "object", "additionalProperties": false, "required": ["min_event_duration_hours", "min_peak_flow_m3_s", "min_event_volume_m3"], "properties": {"min_event_duration_hours": {"type": "number", "minimum": 0}, "min_peak_flow_m3_s": {"type": ["number", "null"], "exclusiveMinimum": 0}, "min_event_volume_m3": {"type": ["number", "null"], "exclusiveMinimum": 0}}},
+    "warmup": {"type": "object", "additionalProperties": false, "required": ["steps"], "properties": {"steps": {"type": "integer", "minimum": 0}}}
+  }
+}
