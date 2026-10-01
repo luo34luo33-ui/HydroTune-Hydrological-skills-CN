@@ -280,7 +280,8 @@ def load_boundary(path: Path | None, times: list, network: dict, timezone: str) 
 
 
 def run_model(config: dict, network: dict, times: list, forcing: dict, boundary: dict,
-              adjusted: dict, dp: dict, coefficients: tuple) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
+              adjusted: dict, dp: dict, coefficients: tuple, *,
+              save_internal_process: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     dt = float(config["time"]["step_seconds"])
     lag = config["routing"]["lag_steps"]
     states = {sub: initial_state(adjusted, config["initial"]) for sub in network["sub_ids"]}
@@ -293,8 +294,9 @@ def run_model(config: dict, network: dict, times: list, forcing: dict, boundary:
         for sub in network["sub_ids"]:
             p_mm, e0_mm = forcing[stamp][sub]
             states[sub], row = local_step(p_mm, e0_mm, float(network["areas"][sub]), dt, adjusted, states[sub])
-            row.update({"time": stamp.isoformat(), "sub_id": sub, "is_warmup": index < config["warmup_steps"]})
-            sub_rows.append(row)
+            if save_internal_process:
+                row.update({"time": stamp.isoformat(), "sub_id": sub, "is_warmup": index < config["warmup_steps"]})
+                sub_rows.append(row)
             delay[sub][index + lag] = (row["local_QS_m3s"], row["local_QI_m3s"], row["local_QG_m3s"])
             local[sub] = delay[sub].pop(index, (0.0, 0.0, 0.0))
             rainfall += p_mm * network["areas"][sub] * 1000.0
@@ -322,12 +324,13 @@ def run_model(config: dict, network: dict, times: list, forcing: dict, boundary:
             routed[reach] = outputs
             channel_in += sum(in_components) * dt
             channel_out += sum(outputs) * dt
-            reach_rows.append({"time": stamp.isoformat(), "reach_id": reach,
-                               "is_warmup": index < config["warmup_steps"],
-                               "in_QS_m3s": in_components[0], "in_QI_m3s": in_components[1],
-                               "in_QG_m3s": in_components[2], "out_QS_m3s": outputs[0],
-                               "out_QI_m3s": outputs[1], "out_QG_m3s": outputs[2],
-                               "out_Q_m3s": sum(outputs), "boundary_Q_m3s": external})
+            if save_internal_process:
+                reach_rows.append({"time": stamp.isoformat(), "reach_id": reach,
+                                   "is_warmup": index < config["warmup_steps"],
+                                   "in_QS_m3s": in_components[0], "in_QI_m3s": in_components[1],
+                                   "in_QG_m3s": in_components[2], "out_QS_m3s": outputs[0],
+                                   "out_QI_m3s": outputs[1], "out_QG_m3s": outputs[2],
+                                   "out_Q_m3s": sum(outputs), "boundary_Q_m3s": external})
         outlet = routed[network["outlet"]]
         outlet_rows.append({"time": stamp.isoformat(), "outlet_reach_id": network["outlet"],
                             "is_warmup": index < config["warmup_steps"],
@@ -348,10 +351,15 @@ def execute(args: argparse.Namespace) -> dict:
     adjusted, dp, coefficients = validate_config(config, network)
     times, forcing = load_forcing(args.forcing, config, network)
     boundary = load_boundary(args.boundary_inflow, times, network, config["time"]["timezone"])
-    sub, reach, outlet, metrics = run_model(config, network, times, forcing, boundary, adjusted, dp, coefficients)
+    output_detail = getattr(args, "output_detail", "full")
+    save_internal_process = output_detail == "full"
+    sub, reach, outlet, metrics = run_model(config, network, times, forcing, boundary, adjusted, dp, coefficients,
+                                          save_internal_process=save_internal_process)
     output = args.output_dir
-    sub.to_csv(output / OUTPUTS[0], index=False, encoding="utf-8")
-    reach.to_csv(output / OUTPUTS[1], index=False, encoding="utf-8")
+    if save_internal_process:
+        sub.to_csv(output / OUTPUTS[0], index=False, encoding="utf-8")
+        reach.to_csv(output / OUTPUTS[1], index=False, encoding="utf-8")
+    generated_outputs = OUTPUTS[:-1] if save_internal_process else OUTPUTS[2:-1]
     outlet.to_csv(output / OUTPUTS[2], index=False, encoding="utf-8")
     (output / OUTPUTS[3]).write_text(json.dumps(config, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     warnings = list(qc.get("warnings", []))
@@ -367,9 +375,9 @@ def execute(args: argparse.Namespace) -> dict:
             "parameters": {"time": config["time"], "warmup_steps": config["warmup_steps"],
                            "simulation": config["simulation"], "routing": config["routing"],
                            "xaj": config["xaj"], "initial": config["initial"],
-                           "muskingum_coefficients": coefficients},
+                           "muskingum_coefficients": coefficients, "output_detail": output_detail},
             "inputs": inputs, "artifacts": {name.removesuffix(".csv").removesuffix(".json"): reference(output / name, output)
-                                         for name in OUTPUTS[:-1]},
+                                         for name in generated_outputs},
             "checks": [{"check": "hydrobase_qc", "status": "PASS", "details": "independent validation and hashes checked"},
                        {"check": "finite_outputs", "status": "PASS", "details": "all simulated flows are finite"},
                        {"check": "accounting_reported", "status": "PASS", "details": metrics}],
@@ -387,6 +395,8 @@ def parser() -> argparse.ArgumentParser:
     for name in ("topology-result", "topology-qc-result", "forcing", "params", "output-dir"):
         p.add_argument("--" + name, type=Path, required=True)
     p.add_argument("--boundary-inflow", type=Path)
+    p.add_argument("--output-detail", choices=("outlet-only", "full"), default="full",
+                   help="outlet-only omits internal process tables and their in-memory history; full preserves legacy outputs (default)")
     p.add_argument("--overwrite", action="store_true")
     return p
 

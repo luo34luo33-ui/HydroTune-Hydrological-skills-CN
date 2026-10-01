@@ -1,0 +1,14 @@
+{
+  "template_version": "hydrotune.hydrobase-topology.v2",
+  "font_family": [
+    "Times New Roman",
+    "SimSun"
+  ],
+  "tick_size": 16,
+  "legend_size": 16,
+  "count_size": 18,
+  "subbasin_edge": "#C8C8C8",
+  "subbasin_edge_width": 0.65,
+  "basin_edge_width": 1.5,
+  "longest_side_px": 2400
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "package_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paragraphs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "verdict": {
+            "enum": [
+              "supported",
+              "unsupported",
+              "uncertain"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "evidence_ids",
+          "verdict",
+          "rationale"
+        ]
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "package_fingerprint",
+    "reviewer",
+    "paragraphs"
+  ]
+}

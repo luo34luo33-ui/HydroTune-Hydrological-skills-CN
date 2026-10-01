@@ -164,7 +164,7 @@ def grid_layer(spec, units, crs, config_base):
         cells = {(r,c): Polygon([affine * (c,r), affine * (c+1,r), affine * (c+1,r+1), affine * (c,r+1)]) for r in range(height) for c in range(width)}
     else:
         raise QCError("grid kind must be netcdf or geotiff")
-    if len(axis) < 2 or axis.has_duplicates or axis.isna().any() or not (np.diff(axis.asi8) == spec["timestep_seconds"] * 10**9).all():
+    if len(axis) < 2 or axis.has_duplicates or axis.isna().any() or not (np.diff(axis) == pd.Timedelta(seconds=spec["timestep_seconds"])).all():
         raise QCError("gridded time axis missing, duplicate or irregular")
     if spec["timestamp_semantics"] == "interval_start":
         axis += pd.Timedelta(seconds=spec["timestep_seconds"])

@@ -13,6 +13,7 @@ import sys
 import tempfile
 from typing import Any
 import uuid
+import zipfile
 
 from repository import (
     RepositoryError,
@@ -30,6 +31,43 @@ from validate_workflows import validate_repository as validate_workflows_reposit
 MANIFEST_NAME = ".hydrotune-skills-manifest.json"
 MANIFEST_SCHEMA_VERSION = 1
 SAFE_INSTALL_NAME = re.compile(r"^hydro-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def retire_processing_report(target: Path, owned: dict[str, Any], *, dry_run: bool) -> None:
+    """Preserve a managed old installation before retiring the renamed skill."""
+    old = "hydro-visualization-reporting-generate-data-processing-report"
+    previous = owned.get(old)
+    if not isinstance(previous, dict) or previous.get("source") != "visualization-reporting/generate-data-processing-report":
+        return
+    root = target.resolve()
+    path = target / old
+    if path.is_symlink() or path.resolve() != root / old:
+        raise InstallerError(f"旧报告安装目录不是安全的受管目录: {path}")
+    if path.exists() and not path.is_dir():
+        raise InstallerError(f"旧报告安装项不是目录: {path}")
+    files = list(path.rglob("*")) if path.is_dir() else []
+    if any(p.is_symlink() or not p.resolve().is_relative_to(path.resolve()) for p in files):
+        raise InstallerError("旧报告安装项包含链接，拒绝自动迁移")
+    if dry_run:
+        print(f"  将归档并移除已重命名的受管安装项: {old}")
+        return
+    if path.is_dir():
+        archives = target / ".hydrotune-retired-skills"
+        if archives.is_symlink() or not archives.resolve().is_relative_to(root):
+            raise InstallerError("归档目录超出安装目标，拒绝迁移")
+        archives.mkdir(exist_ok=True)
+        archive = archives / f"{old}-{uuid.uuid4().hex}.zip"
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for item in sorted(files):
+                if item.is_file():
+                    bundle.write(item, item.relative_to(path))
+        # Resolve again immediately before recursive removal; never remove a computed
+        # target outside the explicitly selected installation directory.
+        if path.resolve() != root / old:
+            raise InstallerError("旧报告目录在归档期间发生变化，拒绝移除")
+        shutil.rmtree(path)
+        print(f"  旧报告已归档: {archive}")
+    del owned[old]
 
 
 class InstallerError(RuntimeError):
@@ -157,8 +195,10 @@ def write_manifest(target: Path, manifest: dict[str, Any]) -> None:
 def _write_rendered_directory(target: Path, install_name: str, files: dict[str, bytes]) -> None:
     target.mkdir(parents=True, exist_ok=True)
     destination = target / install_name
-    temporary = Path(tempfile.mkdtemp(prefix=f".{install_name}.tmp-", dir=target))
-    backup = target / f".{install_name}.backup-{uuid.uuid4().hex}"
+    # Keep staging paths short: long skill names plus nested project paths can
+    # exceed Windows MAX_PATH before the final directory is installed.
+    temporary = Path(tempfile.mkdtemp(prefix=".hydrotune-tmp-", dir=target))
+    backup = target / f".hydrotune-backup-{uuid.uuid4().hex}"
     try:
         for relative_path, content in files.items():
             output = temporary / Path(relative_path)
@@ -328,6 +368,9 @@ def install_records(
             print(f"  已安装: {install_name}")
         installed += 1
 
+    renamed = "hydro-visualization-reporting-generate-timeseries-data-processing-report"
+    if update and renamed in rendered:
+        retire_processing_report(target, owned, dry_run=dry_run)
     if not dry_run:
         manifest["tool"] = tool_name
         write_manifest(target, manifest)

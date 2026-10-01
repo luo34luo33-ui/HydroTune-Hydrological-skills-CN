@@ -20,3 +20,9 @@
 - 集总式任务不强制要求空间分支；半分布式任务必须具备可验证拓扑。
 - 所有进入下游模型的字段都应能追溯到源数据、确定性处理或用户确认。
 
+## 处理结果报告
+
+完成所需处理步骤后，可将本次范围和 result.json 路径写入 processing-manifest.json，调用 generate-timeseries-data-processing-report，直接输出 Markdown、JSON、业务汇总 CSV 与关键图件。时序单项成果可生成资料概况；空间报告使用独立清单与入口；不要求运行模拟、率定或评价。后台保留具体上游 QC，不自行给出完整建模就绪性结论。
+
+
+时序分支使用 generate-timeseries-data-processing-report 汇总洪水规模和显著峰型；半分布式空间准备分支使用 generate-spatial-data-processing-report 汇总流域、子流域、河段与拓扑。两类正文不展示核验台账，不自动重跑上游。

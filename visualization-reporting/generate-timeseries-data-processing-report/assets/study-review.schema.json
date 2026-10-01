@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "needs_revision",
+        "needs_human_review"
+      ]
+    },
+    "package_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_review_completed": {
+      "type": "boolean"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "report_location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "actual": {},
+          "expected": {},
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "needs_human_judgment": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "report_location",
+          "evidence_location",
+          "actual",
+          "expected",
+          "severity",
+          "action",
+          "needs_human_judgment"
+        ]
+      },
+      "minItems": 0
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "package_fingerprint",
+    "semantic_review_completed",
+    "findings",
+    "checks"
+  ]
+}

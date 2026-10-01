@@ -1,0 +1,51 @@
+{
+  "template_version": "hydrotune.flood-event-atlas.v2",
+  "canvas": {
+    "width_px": 2400,
+    "height_px": 1200,
+    "figsize_inches": [
+      12,
+      6
+    ],
+    "dpi": 200,
+    "background": "#FFFFFF",
+    "panel_background": "#FFFFFF"
+  },
+  "typography": {
+    "zh": [
+      "SimSun"
+    ],
+    "en": [
+      "Times New Roman"
+    ],
+    "body_size": 16,
+    "axis_label_size": 18,
+    "tick_size": 16,
+    "legend_size": 16,
+    "summary_size": 16
+  },
+  "colors": {
+    "ink": "#000000",
+    "muted_ink": "#444444",
+    "discharge": "#000000",
+    "baseflow": "#555555",
+    "quickflow": "#8FC7D8",
+    "peak": "#D62828",
+    "event_band": "#FFFFFF",
+    "warmup_band": "#EEEEEE",
+    "pass": "#287A53",
+    "warn": "#C47A16",
+    "fail": "#B33A32",
+    "grid": "#D8D8D8",
+    "rainfall": "#9CCAE8"
+  },
+  "layout": {
+    "main_axes": [
+      0.09,
+      0.15,
+      0.82,
+      0.81
+    ],
+    "rainfall_alpha": 0.5
+  }
+}

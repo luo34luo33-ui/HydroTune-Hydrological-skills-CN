@@ -1,0 +1,7 @@
+{
+  "spatial_scope": "basin_mean",
+  "unit": "mm/step",
+  "timestep_seconds": 3600,
+  "timestamp_semantics": "interval_end",
+  "timezone": "Asia/Shanghai"
+}

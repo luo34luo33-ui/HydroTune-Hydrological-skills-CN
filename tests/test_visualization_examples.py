@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -16,7 +17,7 @@ from PIL import Image
 import pytest
 import rasterio
 from rasterio.transform import from_origin
-from shapely.geometry import box
+from shapely.geometry import box, Polygon
 
 
 EXAMPLES = {
@@ -57,17 +58,23 @@ def _assert_atlas(directory: Path, templates: list[str], language: str, repo_roo
     run_schema = json.loads((repo_root / "resources/schemas/visualization-run-result.schema.json").read_text(encoding="utf-8"))
     Draft202012Validator(run_schema).validate(json.loads((directory / "result.json").read_text(encoding="utf-8")))
     for template in templates:
-        png = directory / f"{template}.png"
-        svg = directory / f"{template}.svg"
-        metadata = directory / f"{template}.figure.json"
+        stem = ("HydroBase 水文拓扑" if language == "zh" else "HydroBase hydrological topology") if template == "hydrobase-topology" else template
+        png = directory / f"{stem}.png"
+        svg = directory / f"{stem}.svg"
+        metadata = directory / f"{stem}.figure.json"
         assert png.is_file() and svg.is_file() and metadata.is_file()
+        document = json.loads(metadata.read_text(encoding="utf-8"))
         with Image.open(png) as image:
-            assert image.size == (2400, 1600)
+            assert image.size == (document["pixel_size"]["width"], document["pixel_size"]["height"])
+            if document["template_version"] in {"hydrotune.dem-hydrology-atlas.v2", "hydrotune.hydrobase-morphometry.v2", "hydrotune.hydrobase-topology.v2", "hydrotune.hydrobase-qc-dashboard.v2"}:
+                assert max(image.size) == 2400
+                assert image.convert("RGB").getpixel((0, 0)) == (255, 255, 255)
+            else:
+                assert image.size == (2400, 1600)
             assert np.asarray(image.convert("RGB")).std() > 5
         ET.parse(svg)
         svg_text = svg.read_text(encoding="utf-8")
         assert "HydroTune spatial atlas" not in svg_text
-        document = json.loads(metadata.read_text(encoding="utf-8"))
         Draft202012Validator(figure_schema).validate(document)
         assert document["language"] == language
         assert document["template_id"] == template
@@ -81,14 +88,76 @@ def test_visualization_scripts_support_help(repo_root: Path) -> None:
         assert "--output-dir" in result.stdout
 
 
-def test_atlas_style_assets_are_identical_and_valid(repo_root: Path) -> None:
-    dem_style = repo_root / "visualization-reporting/visualize-dem-hydrology-atlas/assets/atlas-style-v1.json"
+def test_atlas_styles_have_independent_versions(repo_root: Path) -> None:
+    dem_style = repo_root / "visualization-reporting/visualize-dem-hydrology-atlas/assets/atlas-style-v2.json"
     hydro_style = repo_root / "visualization-reporting/visualize-hydrobase-atlas/assets/atlas-style-v1.json"
-    assert dem_style.read_bytes() == hydro_style.read_bytes()
     style = json.loads(dem_style.read_text(encoding="utf-8"))
-    assert style["template_version"] == "hydrotune.spatial-atlas.v1"
-    assert style["canvas"]["width_px"] == 2400
-    assert style["canvas"]["height_px"] == 1600
+    assert style["template_version"] == "hydrotune.dem-hydrology-atlas.v2"
+    assert style["canvas"]["background"] == style["canvas"]["panel_background"] == "#FFFFFF"
+    assert style["typography"]["zh"] == ["SimSun"]
+    assert style["typography"]["en"] == ["Times New Roman"]
+    assert json.loads(hydro_style.read_text(encoding="utf-8"))["template_version"] == "hydrotune.spatial-atlas.v1"
+
+
+def test_dem_display_clips_outliers_and_polygon_holes(repo_root: Path, monkeypatch) -> None:
+    folder = (repo_root / EXAMPLES["dem_atlas"]).parent
+    def load(name, path):
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    common = load("dem_common_test", folder / "_atlas_common.py")
+    monkeypatch.setitem(sys.modules, "_atlas_common", common)
+    renderer = load("dem_renderer_test", folder / "render_dem_hydrology_atlas.py")
+    style = common.load_style(folder / "render_dem_hydrology_atlas.py")
+    common.configure_rendering(style, "zh")
+    polygon = Polygon([(1, 1), (9, 1), (9, 7), (6, 9), (1, 7)],
+                      holes=[[(4, 4), (4, 6), (6, 6), (6, 4)]])
+    basin = gpd.GeoDataFrame(geometry=[polygon], crs="EPSG:32649")
+    transform = from_origin(0, 10, 1, 1)
+    meta = {"transform": tuple(transform), "bounds": rasterio.coords.BoundingBox(0, 0, 10, 10),
+            "crs": "EPSG:32649", "width": 10, "height": 10}
+    values = np.full((10, 10), 10.0)
+    values[0, :] = 99999
+    values[4:6, 4:6] = 99999
+    figure, axis, extent = renderer._new_map(style, basin, meta["crs"], "zh")
+    image, masked = renderer._basin_image(axis, values, meta, basin, cmap="terrain")
+    assert np.isnan(masked[0, :]).all()
+    assert np.isnan(masked[4:6, 4:6]).all()
+    assert np.nanmax(masked) == 10
+    assert image.get_clip_path() is not None
+    assert extent == pytest.approx([0.44, 9.56, 0.44, 9.56])
+    assert not figure.texts  # no external title, subtitle, status or CRS footer
+    renderer._inside_colorbar(axis, image, style, "高程（m）")
+    renderer._side_legend(axis, [renderer.Patch(label="真实流域边界")], style)
+    figure.canvas.draw()
+    main_box = axis.get_window_extent()
+    for inset in axis.child_axes:
+        bbox = inset.get_window_extent()
+        assert main_box.contains(bbox.x0, bbox.y0) and main_box.contains(bbox.x1, bbox.y1)
+    legend = axis.get_legend().get_window_extent()
+    assert main_box.contains(legend.x0, legend.y0) and main_box.contains(legend.x1, legend.y1)
+    pixels = np.asarray(figure.canvas.buffer_rgba())
+    x, y = axis.transData.transform((5, 5)).astype(int)
+    assert pixels[pixels.shape[0] - y, x, :3].tolist() == [255, 255, 255]
+    common.plt.close(figure)
+
+    # Check true geographic values at projected frame intersections.
+    extent = [500000, 540000, 3950000, 3980000]
+    figure, (axis,) = common.new_figure(style, extent)
+    common.decorate_map(axis, extent, style, "EPSG:32649", "zh")
+    to_geo = common.Transformer.from_crs("EPSG:32649", "EPSG:4326", always_xy=True)
+    assert len(axis.get_xticks()) >= 2 and len(axis.get_yticks()) >= 2
+    for position, label in zip(axis.get_xticks(), axis.get_xticklabels()):
+        longitude, _ = to_geo.transform(position, extent[2])
+        assert label.get_text().endswith("°E")
+        assert float(label.get_text().removesuffix("°E")) == pytest.approx(longitude, abs=1e-5)
+    for position, label in zip(axis.get_yticks(), axis.get_yticklabels()):
+        _, latitude = to_geo.transform(extent[0], position)
+        assert label.get_text().endswith("°N")
+        assert float(label.get_text().removesuffix("°N")) == pytest.approx(latitude, abs=1e-5)
+    assert any(line.get_gid() == "geographic-graticule" for line in axis.lines)
+    common.plt.close(figure)
 
 
 @pytest.mark.integration
@@ -153,7 +222,11 @@ def test_spatial_atlases_end_to_end(repo_root: Path, tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "Glyph" not in result.stderr
     _assert_atlas(dem_zh, dem_templates, "zh", repo_root)
-    assert "流域与 DEM 分析范围" in (dem_zh / "dem-basin-context.svg").read_text(encoding="utf-8")
+    svg = (dem_zh / "dem-basin-context.svg").read_text(encoding="utf-8")
+    assert "流域与 DEM 分析范围" not in svg
+    assert "SimSun" in svg and "Times New Roman" in svg
+    metadata = json.loads((dem_zh / "dem-basin-context.figure.json").read_text(encoding="utf-8"))
+    assert metadata["title"] == "流域与 DEM 分析范围"
 
     hydro_en = workspace / "08 HydroBase atlas EN"
     result = _run(repo_root, "hydrobase_atlas", "--build-result", str(built / "result.json"),
@@ -168,14 +241,43 @@ def test_spatial_atlases_end_to_end(repo_root: Path, tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "Glyph" not in result.stderr
     _assert_atlas(hydro_zh, hydro_templates, "zh", repo_root)
+    qc_svg=(hydro_zh / "hydrobase-qc-dashboard.svg").read_text(encoding="utf-8")
+    assert "检查汇总" in qc_svg
+    assert "限制说明" not in qc_svg
+    assert "HydroBase 质量控制看板" not in qc_svg
+    qc_checks=json.loads((validated / "result.json").read_text(encoding="utf-8"))["checks"]
+    if not any(check["status"] in {"WARN","FAIL"} for check in qc_checks):
+        assert "重要证据" not in qc_svg and "未记录 WARN 或 FAIL" not in qc_svg
+        assert "重要证据" not in qc_svg
+    topology_svg=(hydro_zh / "HydroBase 水文拓扑.svg").read_text(encoding="utf-8")
+    assert "HydroBase 水文拓扑" not in topology_svg
+    assert "子流域数量" in topology_svg
+    assert "SimSun" in topology_svg and "Times New Roman" in topology_svg
+    assert 'id="subbasin-count"' in topology_svg
+    assert 'id="north-arrow"' in topology_svg
+    assert 'id="geographic-graticule"' in topology_svg
+    topology_doc=json.loads((hydro_zh / "HydroBase 水文拓扑.figure.json").read_text(encoding="utf-8"))
+    count=int(pd.read_csv(built / "subbasins.csv")["sub_id"].nunique())
+    assert any(f"count={count};" in layer["display_transform"] for layer in topology_doc["layers"])
+    assert topology_doc["template_version"] == "hydrotune.hydrobase-topology.v2"
+    morph_svg=(hydro_zh / "hydrobase-morphometry.svg").read_text(encoding="utf-8")
+    assert "HydroBase 形态属性" not in morph_svg
+    assert "(a) 子流域面积" in morph_svg and "(b) 河段坡度" in morph_svg and "(c) 拓扑层级" in morph_svg
+    assert "SimSun" in morph_svg and "Times New Roman" in morph_svg
+    assert morph_svg.count('id="geographic-graticule') >= 6
+    assert morph_svg.count('id="north-arrow') == 6
+    morph_doc=json.loads((hydro_zh / "hydrobase-morphometry.figure.json").read_text(encoding="utf-8"))
+    assert morph_doc["source_results"]["basin_boundary"]["sha256"] == _sha256(prepared / "basin_normalized.gpkg")
+    assert 2.4 <= morph_doc["pixel_size"]["width"] / morph_doc["pixel_size"]["height"] <= 3.2
 
     hydro_repeat = workspace / "09b HydroBase atlas EN repeat"
     result = _run(repo_root, "hydrobase_atlas", "--build-result", str(built / "result.json"),
                   "--validation-result", str(validated / "result.json"), "--language", "en", "--output-dir", str(hydro_repeat))
     assert result.returncode == 0, result.stderr
     for template in hydro_templates:
-        assert _sha256(hydro_en / f"{template}.png") == _sha256(hydro_repeat / f"{template}.png")
-        assert _sha256(hydro_en / f"{template}.svg") == _sha256(hydro_repeat / f"{template}.svg")
+        stem = "HydroBase hydrological topology" if template == "hydrobase-topology" else template
+        assert _sha256(hydro_en / f"{stem}.png") == _sha256(hydro_repeat / f"{stem}.png")
+        assert _sha256(hydro_en / f"{stem}.svg") == _sha256(hydro_repeat / f"{stem}.svg")
 
     dem_partial = workspace / "10 DEM partial"
     result = _run(repo_root, "dem_atlas", "--prepare-result", str(prepared / "result.json"),
@@ -204,6 +306,10 @@ def test_spatial_atlases_end_to_end(repo_root: Path, tmp_path: Path) -> None:
     failed_document = json.loads((failed_atlas / "result.json").read_text(encoding="utf-8"))
     assert failed_document["status"] == "error"
     _assert_atlas(failed_atlas, ["hydrobase-qc-dashboard"], "en", repo_root)
+    failed_svg=(failed_atlas / "hydrobase-qc-dashboard.svg").read_text(encoding="utf-8")
+    assert "QC FAILED" in failed_svg and "Key evidence" in failed_svg
+    assert "Limitations" not in failed_svg
+    assert "Check summary" in failed_svg
     assert not (failed_atlas / "hydrobase-topology.png").exists()
 
     extract_result_path = extracted / "result.json"

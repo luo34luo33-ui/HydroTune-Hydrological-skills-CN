@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "enum": [
+        "zh",
+        "en"
+      ],
+      "default": "zh"
+    },
+    "required_preprocessing": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "minItems": 0
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "stage": {
+            "enum": [
+              "preprocessing",
+              "spatial",
+              "simulation",
+              "calibration",
+              "evaluation",
+              "atlas"
+            ]
+          },
+          "result": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object",
+            "properties": {
+              "split": {
+                "enum": [
+                  "calibration",
+                  "validation",
+                  "evaluation",
+                  "simulation"
+                ]
+              },
+              "mode": {
+                "enum": [
+                  "continuous",
+                  "event_collection"
+                ]
+              },
+              "period": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "end": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ]
+              },
+              "event_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              },
+              "timestep_hours": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "warmup_steps": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "scored": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "run_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "required": [
+          "id",
+          "stage",
+          "result"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "stage": {
+                  "const": "evaluation"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "context"
+              ],
+              "properties": {
+                "context": {
+                  "required": [
+                    "mode",
+                    "split"
+                  ],
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "const": "continuous"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "period"
+                        ]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "const": "event_collection"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "event_ids"
+                        ],
+                        "properties": {
+                          "event_ids": {
+                            "minItems": 1,
+                            "uniqueItems": true
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 2
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "simulation": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "calibration": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "required": [
+          "id",
+          "simulation",
+          "evaluations"
+        ]
+      },
+      "minItems": 1
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "peak_thresholds_m3_s": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "volume_thresholds_m3": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "significant_peaks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prominence_m3_s",
+            "minimum_spacing_hours"
+          ],
+          "properties": {
+            "prominence_m3_s": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "minimum_spacing_hours": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "worst_event_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_processes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run_id",
+              "evaluation_source",
+              "event_id",
+              "path",
+              "sha256",
+              "time_column",
+              "observed_column",
+              "simulated_column"
+            ],
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evaluation_source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "time_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observed_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "simulated_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "precipitation_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "warmup_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scored_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sheet": {
+                "type": "string"
+              },
+              "context": {
+                "type": "object"
+              },
+              "flow_unit": {
+                "const": "m3/s"
+              },
+              "precipitation_unit": {
+                "const": "mm/step"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "title",
+    "sources",
+    "runs"
+  ]
+}

@@ -185,3 +185,65 @@ def test_atlas_rejects_tampered_calibration_artifact(repo_root: Path, tmp_path: 
     assert rendered.returncode == 1
     error_result = json.loads((tmp_path / "atlas" / "result.json").read_text(encoding="utf-8"))
     assert "SHA-256" in error_result["message"]
+
+
+def test_calibration_atlas_multisimulation_alignment_and_event_nse(repo_root: Path, tmp_path: Path) -> None:
+    import numpy as np
+    import pandas as pd
+    output = _run_calibration(repo_root, tmp_path / "comparison", "ga", "event_collection")
+    original = pd.read_csv(output / "validation_series.csv")
+    comparison = original[["event_id", "step"]].copy()
+    comparison["corrected"] = original["observed"]
+    # A deliberately huge warm-up deviation must not affect the scored NSE.
+    comparison.loc[~original["scored"].astype(bool), "corrected"] = 99999
+    comparison.iloc[::-1].to_csv(tmp_path / "comparison.csv", index=False)
+    manifest = {"schema_version": "1.0", "join_on": ["event_id", "step"],
+                "series": [{"label": "后处理", "path": "comparison.csv", "column": "corrected", "unit": "m3/s", "split": "validation"}]}
+    manifest_path = tmp_path / "comparisons.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    script = repo_root / "visualization-reporting/visualize-model-calibration/examples/render_model_calibration_atlas.py"
+    atlas = tmp_path / "multi-atlas"
+    command = [sys.executable, str(script), "--calibration-result", str(output / "result.json"),
+               "--comparison-manifest", str(manifest_path), "--simulation-label", "原始模型",
+               "--language", "zh", "--output-dir", str(atlas), "--overwrite"]
+    rendered = subprocess.run(command, text=True, capture_output=True, encoding="utf-8", errors="replace")
+    assert rendered.returncode == 0, rendered.stderr
+    meta = json.loads((atlas / "validation_event_001.json").read_text(encoding="utf-8"))
+    assert meta["template"] == "hydrotune.model-calibration-atlas.v2"
+    first, corrected = meta["simulation_metrics"]
+    subset = original[original["event_id"] == "E01"]
+    scored = subset[subset["scored"].astype(bool)]
+    expected = 1 - np.sum((scored["simulated"] - scored["observed"]) ** 2) / np.sum((scored["observed"] - scored["observed"].mean()) ** 2)
+    assert first["nse"] == pytest.approx(expected)
+    assert corrected["nse"] == 1.0
+    assert corrected["scored_samples"] == 4
+    assert first["color"] != corrected["color"]
+    assert meta["scope"]["event_ids"] == ["E01"]
+    svg = (atlas / "validation_event_001.svg").read_text(encoding="utf-8")
+    assert "NSE = 1.000" in svg
+    assert "验证期观测" not in svg
+    assert "时间步" in svg and "m³/s" in svg
+    with Image.open(atlas / "validation_event_001.png") as image:
+        assert image.convert("RGB").getpixel((0,0)) == (255,255,255)
+    for field, value in [("unit", "mm"), ("split", "calibration")]:
+        altered = json.loads(json.dumps(manifest));altered["series"][0][field] = value
+        manifest_path.write_text(json.dumps(altered), encoding="utf-8")
+        rendered = subprocess.run(command, text=True, capture_output=True, encoding="utf-8", errors="replace")
+        assert rendered.returncode == 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    comparison.iloc[:-1].to_csv(tmp_path / "comparison.csv", index=False)
+    rendered = subprocess.run(command, text=True, capture_output=True, encoding="utf-8", errors="replace")
+    assert rendered.returncode == 1
+    assert "coverage" in rendered.stderr
+
+
+def test_calibration_plot_nse_degenerate_samples(repo_root: Path, monkeypatch) -> None:
+    import importlib.util
+    import pandas as pd
+    path = repo_root / "visualization-reporting/visualize-model-calibration/examples/_calibration_plot.py"
+    spec = importlib.util.spec_from_file_location("calibration_plot_test", path)
+    module = importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    frame = pd.DataFrame({"observed": [2.,2.,2.], "simulated": [1.,1.,1.], "scored": [False,True,True]})
+    assert module._nse(frame,"simulated") == (None,2,"constant observations")
+    frame["scored"] = [False,False,True]
+    assert module._nse(frame,"simulated")[0] is None

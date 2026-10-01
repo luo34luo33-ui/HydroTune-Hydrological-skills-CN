@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
@@ -17,7 +18,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-TEMPLATE_VERSION = "hydrotune.flood-event-atlas.v1"
+TEMPLATE_VERSION = "hydrotune.flood-event-atlas.v2"
 
 
 class AtlasError(RuntimeError):
@@ -81,7 +82,7 @@ def read_artifact_table(path: Path, sheet_name: str) -> pd.DataFrame:
 
 
 def load_style(script_path: Path) -> dict[str, Any]:
-    path = script_path.resolve().parents[1] / "assets" / "flood-event-style-v1.json"
+    path = script_path.resolve().parents[1] / "assets" / "flood-event-style-v2.json"
     style = json.loads(path.read_text(encoding="utf-8-sig"))
     if style.get("template_version") != TEMPLATE_VERSION:
         raise AtlasError("固定样式版本不受支持")
@@ -90,17 +91,19 @@ def load_style(script_path: Path) -> dict[str, Any]:
 
 def configure(style: dict[str, Any], language: str) -> str:
     available = {item.name.casefold(): item.name for item in font_manager.fontManager.ttflist}
-    selected = next((available[name.casefold()] for name in style["typography"][language] if name.casefold() in available), None)
-    if selected is None:
-        raise AtlasError("中文模式缺少 CJK 字体" if language == "zh" else "英文模式缺少可用字体")
+    names = ["Times New Roman"] + (["SimSun"] if language == "zh" else [])
+    missing = [name for name in names if name.casefold() not in available]
+    if missing:
+        raise AtlasError(f"缺少规定字体: {', '.join(missing)}；中文宋体，英文和数字 Times New Roman")
+    selected = [available[name.casefold()] for name in names]
     colors = style["colors"]
     matplotlib.rcParams.update({
         "font.family": selected, "font.size": style["typography"]["body_size"], "axes.unicode_minus": False,
         "text.color": colors["ink"], "axes.labelcolor": colors["ink"], "axes.edgecolor": colors["muted_ink"],
-        "svg.fonttype": "none", "svg.hashsalt": "hydrotune-flood-event-atlas-v1",
+        "svg.fonttype": "none", "svg.hashsalt": TEMPLATE_VERSION,
         "figure.facecolor": style["canvas"]["background"], "savefig.facecolor": style["canvas"]["background"],
     })
-    return selected
+    return ", ".join(selected)
 
 
 def prepare_output_dir(output_dir: Path, overwrite: bool) -> None:
@@ -111,7 +114,9 @@ def prepare_output_dir(output_dir: Path, overwrite: bool) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     if overwrite:
         for path in output_dir.iterdir():
-            if path.is_file() and (path.name == "result.json" or path.suffix in {".png", ".svg", ".json"}):
+            owned = path.name == "result.json" or re.fullmatch(
+                r"(?:flood-event-overview|event-\d+-hydrograph)\.(?:png|svg|figure\.json)", path.name)
+            if path.is_file() and owned:
                 path.unlink()
 
 
@@ -123,13 +128,14 @@ def save_figure(figure, output_dir: Path, template_id: str, event_id: int | None
                 title: str, source_results: dict, layers: list[dict], warnings: list[str], ready: bool) -> dict[str, dict[str, str]]:
     png = output_dir / f"{template_id}.png"
     svg = output_dir / f"{template_id}.svg"
-    figure.savefig(png, dpi=200, facecolor=figure.get_facecolor(), metadata={"Software": "HydroTune flood event atlas v1"})
+    pixels = [round(value * figure.dpi) for value in figure.get_size_inches()]
+    figure.savefig(png, dpi=figure.dpi, facecolor=figure.get_facecolor(), metadata={"Software": "HydroTune flood event atlas v2", "Title": title})
     figure.savefig(svg, facecolor=figure.get_facecolor(), metadata={"Date": None})
     plt.close(figure)
     metadata = {
         "schema_version": "1.0", "template_version": TEMPLATE_VERSION, "template_id": template_id,
         "event_id": event_id, "language": language, "title": title,
-        "pixel_size": {"width": 2400, "height": 1600}, "source_results": source_results,
+        "pixel_size": {"width": pixels[0], "height": pixels[1]}, "source_results": source_results,
         "layers": layers, "outputs": {"png": file_reference(png, output_dir), "svg": file_reference(svg, output_dir)},
         "warnings": warnings, "publication_ready": ready,
     }

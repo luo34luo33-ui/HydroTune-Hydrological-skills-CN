@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "title": "时序数据预分析报告",
+  "language": "zh",
+  "required_sources": [
+    "events"
+  ],
+  "sources": [
+    {
+      "id": "events",
+      "stage": "preprocessing",
+      "result": "events/result.json"
+    }
+  ],
+  "analysis": {
+    "peak_thresholds_m3_s": [
+      100,
+      500
+    ],
+    "volume_thresholds_m3": [
+      1000000,
+      5000000
+    ],
+    "significant_peaks": {
+      "prominence_m3_s": 20,
+      "minimum_spacing_hours": 6
+    }
+  }
+}

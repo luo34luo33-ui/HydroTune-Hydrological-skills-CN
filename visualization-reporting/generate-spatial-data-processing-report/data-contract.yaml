@@ -1,0 +1,20 @@
+schema_version: "1.0"
+skill: visualization-reporting/generate-spatial-data-processing-report
+inputs:
+  - id: spatial_processing_manifest
+    description: 显式来源清单、关联和分析参数，契约见 assets 中的清单 schema。
+    required: true
+    format: JSON
+outputs:
+  - id: business_report
+    description: 正文、业务统计、明细与固定图表；不展示核验台账。
+    required: true
+    format: Markdown, JSON, CSV, SVG
+  - id: provenance_sidecars
+    description: 独立审查使用的完整性记录、证据索引和资料缺口。
+    required: true
+    format: JSON, CSV
+invariants:
+  - 不自动重跑上游流水线。
+  - 原始数值保留，展示舍入规则记录。
+  - 未提供成果不表述为已完成。

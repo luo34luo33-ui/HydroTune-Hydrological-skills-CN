@@ -1,0 +1,25 @@
+schema_version: "1.0"
+skill: visualization-reporting/generate-hydrological-study-report
+inputs:
+  - id: study_manifest
+    description: 显式上游 result 路径、运行与评价绑定及语言的研究清单。
+    required: true
+    format: JSON
+  - id: report_draft
+    description: finalize 时必需的 prepare 草稿，Agent 仅填写证据绑定论述与作者信息。
+    required: false
+    format: JSON
+outputs:
+  - id: report_package
+    description: 结构化报告与 Markdown 正文、结果 CSV、证据索引、缺口清单、总体统计和事件过程图。
+    required: false
+    format: Markdown, JSON, CSV, PNG and SVG
+  - id: run_result
+    description: 运行状态、检查、warning、产物哈希和 provenance。
+    required: true
+    format: JSON
+invariants:
+  - 必需模拟、评价及声明为必需的其他资料缺失或输入哈希错误时不得生成正式正文。
+  - 不重算科学指标，不修改原始成果，不混合指标定义、单位和评价范围。
+  - Agent 论述必须绑定证据；数量为整数、比例一位小数、指标三位小数，原值保持不变。
+  - prepare 和 finalize 的输入与输出目录不得重叠；已存在目录默认拒绝覆盖。

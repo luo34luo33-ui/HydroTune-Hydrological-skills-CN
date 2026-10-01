@@ -56,12 +56,12 @@ inputs:
         missing_value_semantics: 提供的行不允许缺失；未列出的时段/河段视为无入流。
 outputs:
   - id: subbasin_process
-    description: 每个子流域逐时步土壤状态、三水源深度及本地入河流量。
-    required: true
+    description: 仅 output-detail=full 时生成；每个子流域逐时步土壤状态、三水源深度及本地入河流量。
+    required: false
     format: UTF-8 CSV
   - id: reach_process
-    description: 每个河段逐时步三水源入流、出流和边界入流。
-    required: true
+    description: 仅 output-detail=full 时生成；每个河段逐时步三水源入流、出流和边界入流。
+    required: false
     format: UTF-8 CSV
   - id: outlet_flow
     description: 唯一流域出口的逐时步三水源与总流量，含 is_warmup 标记。
@@ -90,6 +90,8 @@ simulation_period:
   required: true
   semantics: config.simulation.start/end 必须等于预热后首步和序列末步，均为带偏移区间末端时间。
 invariants:
+  - output-detail 为 outlet-only 或 full（兼容默认值）；result.parameters.output_detail 记录选择，artifacts 仅引用实际产物。
+  - outlet-only 不累积内部过程历史，不改变出口流量、预热标记、科学检查或水量记账。
   - 每个子流域面积只用于一次局地产流，且必须来自经验证 HydroBase。
   - 每个子流域恰有一个本地出口河段，整个流域恰有一个最终出口。
   - 每个 time/sub_id 恰有一条 forcing，时间轴严格等间隔。

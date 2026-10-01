@@ -1,0 +1,29 @@
+schema_version: "1.0"
+skill: visualization-reporting/review-hydrological-study-report
+inputs:
+  - id: report_package
+    description: 生成器正式输出或经用户修订的 Markdown、JSON、CSV 与图件报告包。
+    required: true
+    format: directory
+  - id: report_manifest
+    description: 与报告类型一致的 study、processing 或 spatial-processing 显式清单。
+    required: true
+    format: JSON
+  - id: semantic_review
+    description: 绑定当前包 fingerprint、覆盖全部段落的独立 Agent 证据支持度审查。
+    required: false
+    format: JSON
+outputs:
+  - id: review_package
+    description: review.md、review.json 与 review-checklist.csv 问题及审查状态。
+    required: true
+    format: Markdown, JSON and CSV
+  - id: run_result
+    description: 运行状态、产物哈希与 provenance。
+    required: true
+    format: JSON
+invariants:
+  - 独立读取原始成果，不信任生成器自报的检查结果。
+  - 未完成全部语义审查不得给出整体 pass。
+  - 审查只输出意见，不修改报告和上游数据。
+  - 报告或来源改变后既有语义判定失效，须重新审查。

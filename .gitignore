@@ -22,4 +22,4 @@ node_modules/
 HydroTune-skills_Codex_Architecture_Prompt.md
 skill_writing_reference.md
 source_to_skills_development_guide.md
-
+.cache/

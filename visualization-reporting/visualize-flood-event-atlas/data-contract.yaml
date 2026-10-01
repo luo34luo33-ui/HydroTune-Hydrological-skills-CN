@@ -5,6 +5,14 @@ inputs:
     description: extract-flood-events 生成且 artifacts 哈希可验证的 result.json。
     required: true
     format: JSON
+  - id: rainfall
+    description: 可选 time,P_mm 的已确认流域平均雨量；P_mm 为对应间隔深度，不接受未经聚合的站点表。
+    required: false
+    format: UTF-8 CSV
+  - id: rainfall_metadata
+    description: 与 rainfall 同时提供；声明 spatial_scope=basin_mean、unit=mm/step、timestep_seconds、timezone 和 timestamp_semantics。
+    required: false
+    format: JSON
 outputs:
   - id: overview_figure
     description: 全时段流量、基流和事件洪峰总览。
@@ -20,5 +28,9 @@ outputs:
     format: JSON
 invariants:
   - 绘图不得修改事件边界、分量或已有指标。
-  - PNG 必须精确为 2400×1600 像素，SVG 使用同一布局。
+  - v2 PNG 为 2400×1200 像素，SVG 使用同一布局；v1 既有图件仍由 schema 接受。
+  - 白底，无主副标题、外置摘要卡片或 UPSTREAM WARNING；warning 保留在机器附件。
+  - 总洪量仅在显示时按 m3/100000000 转为亿立方米，不重算上游指标。
+  - 雨量柱和右侧倒置轴仅使用已确认的流域平均雨量；浅蓝色、50% 不透明度，位于流量线下方。
+  - 雨量输入必须覆盖流量及预热时段，不填补缺测或自动重采样；总览显示分箱相加保留累计雨量。
   - 长序列抽稀只用于显示且必须记录方法和原始点数。

@@ -19,13 +19,18 @@ python examples/run_semi_distributed_xaj.py `
   --forcing <forcing.csv> `
   --params <model-config.json> `
   --boundary-inflow <boundary.csv> `
+  --output-detail outlet-only `
   --output-dir <new-output-directory>
 ```
 
 未使用边界入流时省略 `--boundary-inflow`。输出目录非空时拒绝；`--overwrite` 只替换本 Skill 的五个声明产物。输入或配置错误退出码 1，科学 QC 失败退出码 2，成功及 warning 退出码 0。
 
+常规模拟建议显式传入 `--output-detail outlet-only`：只保存 `outlet_flow.csv`、`model_config.json` 和 `result.json`，不累积内部过程历史。需要子流域状态和逐河段诊断时使用 `--output-detail full`。为兼容原有脚本，省略此选项仍输出 full。`--overwrite` 从 full 切换至 outlet-only 时会移除同目录旧的两张内部过程表，避免把旧文件误认为本次成果。
+
+Python 调用 `run_model(..., save_internal_process=False)` 可同样关闭内部历史；返回的前两张 DataFrame 为空，出口过程及记账量保持不变。该接口不写文件。
+
 ## 输出与解释
 
-`subbasin_process.csv` 保存局地产流状态和分量；`reach_process.csv` 保存每个河段的三水源入出流；`outlet_flow.csv` 保存唯一出口总流量。所有表保留预热行，并以 `is_warmup` 标注。`result.json` 保存空间验证链、哈希、运行参数和水量记账量。河道入流减出流体积包含末端路由状态，不能单独作为水量守恒失败判据。
+full 模式中，`subbasin_process.csv` 保存局地产流状态和分量，`reach_process.csv` 保存每个河段的三水源入出流。两种模式均保存 `outlet_flow.csv` 的唯一出口三水源及总流量。所有已输出的过程表保留预热行，并以 `is_warmup` 标注。`result.json` 保存空间验证链、哈希、运行参数、输出模式和水量记账量，只引用本次实际生成的产物。河道入流减出流体积包含末端路由状态，不能单独作为水量守恒失败判据。
 
 该模型的拓扑汇流是对原脚本的有意扩展。原脚本九区独立求和仅用于验证局地 XAJ 与逐段 Muskingum 数值方程。

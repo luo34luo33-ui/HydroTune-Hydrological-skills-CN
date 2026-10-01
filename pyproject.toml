@@ -29,6 +29,10 @@ spatial = [
   "xarray>=2024.1,<2027",
   "netCDF4>=1.6,<2",
 ]
+reporting = [
+  "matplotlib>=3.7,<4",
+  "scipy>=1.11,<2",
+]
 visualization = [
   "geopandas>=0.14,<2",
   "matplotlib>=3.7,<4",

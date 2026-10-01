@@ -2,11 +2,60 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hydrotune.local/schemas/calibration-figure.schema.json",
   "type": "object",
-  "required": ["schema_version", "template", "figure_type", "language", "width_px", "height_px", "inputs", "display_transforms", "warnings"],
+  "required": [
+    "schema_version",
+    "template",
+    "figure_type",
+    "language",
+    "width_px",
+    "height_px",
+    "inputs",
+    "display_transforms",
+    "warnings"
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"}, "template": {"const": "hydrotune.model-calibration-atlas.v1"},
-    "figure_type": {"enum": ["overview", "validation-process", "validation-scatter"]}, "language": {"enum": ["zh", "en"]},
-    "width_px": {"const": 2400}, "height_px": {"const": 1600}, "inputs": {"type": "object"},
-    "display_transforms": {"type": "array", "items": {"type": "string"}}, "warnings": {"type": "array", "items": {"type": "string"}}
+    "schema_version": {
+      "const": "1.0"
+    },
+    "template": {
+      "enum": [
+        "hydrotune.model-calibration-atlas.v1",
+        "hydrotune.model-calibration-atlas.v2"
+      ]
+    },
+    "figure_type": {
+      "enum": [
+        "overview",
+        "validation-process",
+        "validation-scatter"
+      ]
+    },
+    "language": {
+      "enum": [
+        "zh",
+        "en"
+      ]
+    },
+    "width_px": {
+      "const": 2400
+    },
+    "height_px": {
+      "const": 1600
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "display_transforms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }

@@ -184,127 +184,16 @@ def _legend(axis, style, max_order, text):
     axis.legend(handles=handles, loc="center left", bbox_to_anchor=(1.035, 0.52), frameon=False, labelspacing=0.9)
 
 
-def _render_topology(style, text, status, subbasins, meta, reaches, output_dir, language,
-                     source_results, warnings):
-    extent = extent_from_meta(meta)
-    figure, (axis,) = new_figure(style)
-    add_header(figure, text["topology_title"], text["topology_subtitle"], style)
-    add_status_badge(figure, status, style)
-    _plot_subbasins(axis, subbasins, extent, style)
-    max_order, _ = _plot_reaches(axis, reaches, style, arrows=True, labels=True, text=text)
-    decorate_map(axis, extent, style, meta["crs"], language)
-    _legend(axis, style, max_order, text)
-    return save_figure(
-        figure, output_dir, "hydrobase-topology", language, text["topology_title"], source_results,
-        [
-            {"id": "subbasins", "source": "build_result.artifacts.subbasins_clipped", "display_transform": "stable categorical IDs", "palette": "subbasins"},
-            {"id": "reaches", "source": "build_result.artifacts.reaches_vector", "display_transform": "line width and color by Strahler order", "palette": "water"},
-            {"id": "flow-direction", "source": "build_result.artifacts.reaches_vector", "display_transform": "fixed selected-reach arrows", "palette": "ink"},
-            {"id": "outlets", "source": "build_result.artifacts.reaches_vector", "display_transform": "existing is_outlet flag", "palette": "outlet-star"},
-        ], meta["crs"], extent, warnings, status == "success",
-    )
+from _topology_plot import render_topology as _render_topology
 
 
-def _render_morphometry(style, text, status, subbasins, meta, reaches, sub_table, output_dir,
-                        language, source_results, warnings):
-    extent = extent_from_meta(meta)
-    figure, axes = new_figure(style, panels=3)
-    add_header(figure, text["morph_title"], text["morph_subtitle"], style)
-    add_status_badge(figure, status, style)
-
-    area_lookup = {int(row.sub_id): float(row.area_km2) for row in sub_table.itertuples()}
-    area_grid = np.full(subbasins.shape, np.nan)
-    for identifier, value in sorted(area_lookup.items()):
-        area_grid[subbasins == identifier] = value
-    valid_area = area_grid[np.isfinite(area_grid)]
-    if valid_area.size == 0:
-        raise AtlasError("无法从既有 subbasins.csv 映射子流域面积")
-    area_image = axes[0].imshow(area_grid, extent=extent, origin="upper", cmap="YlGnBu", interpolation="nearest",
-                                vmin=float(valid_area.min()), vmax=float(valid_area.max()) if valid_area.max() > valid_area.min() else float(valid_area.min() + 1), zorder=1)
-    figure.colorbar(area_image, ax=axes[0], orientation="horizontal", fraction=0.045, pad=0.04).set_label(text["area"], fontsize=8)
-
-    slope_values = pd.to_numeric(reaches["slope_percent"], errors="coerce")
-    slope_max = max(float(slope_values.quantile(0.98)), 0.01)
-    reaches.assign(_metric=slope_values).plot(ax=axes[1], column="_metric", cmap="cividis", vmin=0, vmax=slope_max,
-                                              linewidth=2.0, legend=True, legend_kwds={"orientation": "horizontal", "fraction": 0.045, "pad": 0.04, "label": text["slope"]}, zorder=4)
-    level_values = pd.to_numeric(reaches["topo_level"], errors="coerce")
-    level_max = max(int(level_values.max()), 1)
-    reaches.assign(_metric=level_values).plot(ax=axes[2], column="_metric", cmap="Blues", vmin=1, vmax=max(level_max, 2),
-                                              linewidth=2.0, legend=True, legend_kwds={"orientation": "horizontal", "fraction": 0.045, "pad": 0.04, "label": text["level"]}, zorder=4)
-    panel_titles = [text["area"], text["slope"], text["level"]]
-    for axis, panel_title in zip(axes, panel_titles):
-        axis.set_title(panel_title, fontsize=11, weight="bold", pad=9)
-        axis.set_xlim(extent[0], extent[1])
-        axis.set_ylim(extent[2], extent[3])
-        axis.set_aspect("equal", adjustable="box")
-        axis.set_xticks([])
-        axis.set_yticks([])
-        for spine in axis.spines.values():
-            spine.set_linewidth(0.5)
-            spine.set_color("#B8B6AF")
-    figure.text(0.055, 0.072, ("坐标参考系" if language == "zh" else "CRS") + f": {meta['crs']}", fontsize=7.5, color=style["colors"]["muted_ink"])
-    return save_figure(
-        figure, output_dir, "hydrobase-morphometry", language, text["morph_title"], source_results,
-        [
-            {"id": "subbasin-area", "source": "build_result.artifacts.subbasins_table", "display_transform": f"linear area mapped by sub_id; vmin={float(valid_area.min()):.6g}; vmax={float(valid_area.max()):.6g}", "palette": "YlGnBu"},
-            {"id": "reach-slope", "source": "build_result.artifacts.reaches_table", "display_transform": f"linear 0-98 percentile clipping for display; vmin=0; vmax={slope_max:.6g}", "palette": "cividis"},
-            {"id": "topological-level", "source": "build_result.artifacts.reaches_table", "display_transform": f"linear existing topo_level; vmin=1; vmax={level_max}", "palette": "Blues"},
-        ], meta["crs"], extent, warnings, status == "success",
-    )
+from _morphometry_plot import render_morphometry as _render_morphometry
 
 
 def _render_dashboard(style, text, status, subbasins, meta, reaches, validation, output_dir,
-                      language, source_results, warnings):
-    extent = extent_from_meta(meta)
-    canvas = style["canvas"]
-    figure = plt.figure(figsize=canvas["figsize_inches"], dpi=canvas["dpi"], facecolor=canvas["background"])
-    map_axis = figure.add_axes([0.055, 0.12, 0.57, 0.72], facecolor=canvas["panel_background"])
-    card_axis = figure.add_axes([0.665, 0.12, 0.29, 0.72], facecolor=canvas["panel_background"])
-    add_header(figure, text["qc_title"], text["qc_subtitle"], style)
-    add_status_badge(figure, status, style)
-    _plot_subbasins(map_axis, subbasins, extent, style, alpha=0.78)
-    _plot_reaches(map_axis, reaches, style, arrows=False, labels=False, text=text, outlet_labels=False)
-    decorate_map(map_axis, extent, style, meta["crs"], language)
-
-    card_axis.set_xticks([])
-    card_axis.set_yticks([])
-    for spine in card_axis.spines.values():
-        spine.set_color("#D5D2CA")
-        spine.set_linewidth(0.7)
-    checks = validation.get("checks", [])
-    counts = Counter(check.get("status") for check in checks)
-    card_axis.text(0.06, 0.94, text["checks"], transform=card_axis.transAxes, fontsize=13, weight="bold", va="top")
-    x_positions = [0.08, 0.38, 0.68]
-    for x, label, color in zip(x_positions, ("PASS", "WARN", "FAIL"), (style["colors"]["pass"], style["colors"]["warn"], style["colors"]["fail"])):
-        card_axis.text(x, 0.82, str(counts.get(label, 0)), transform=card_axis.transAxes, fontsize=24, weight="bold", color=color, ha="left")
-        card_axis.text(x, 0.765, label, transform=card_axis.transAxes, fontsize=8, color=style["colors"]["muted_ink"], ha="left")
-    card_axis.plot([0.06, 0.94], [0.72, 0.72], transform=card_axis.transAxes, color="#D5D2CA", lw=0.8)
-    card_axis.text(0.06, 0.675, text["evidence"], transform=card_axis.transAxes, fontsize=11, weight="bold", va="top")
-    notable = [check for check in checks if check.get("status") in {"WARN", "FAIL"}]
-    if not notable:
-        evidence_lines = [text["no_issues"]]
-    else:
-        evidence_lines = [f"{item.get('status')}: {item.get('check')} — {item.get('details', '')}" for item in notable[:6]]
-    y = 0.62
-    for line in evidence_lines:
-        wrapped = line if len(line) <= 58 else line[:55] + "…"
-        card_axis.text(0.06, y, wrapped, transform=card_axis.transAxes, fontsize=8.3,
-                       color=style["colors"]["fail"] if line.startswith("FAIL") else style["colors"]["ink"], va="top")
-        y -= 0.075
-    outlet_check = next((check for check in checks if check.get("check") == "outlet_count"), None)
-    if outlet_check is not None:
-        card_axis.text(0.06, max(y - 0.01, 0.22), f"{text['outlet']}: {outlet_check.get('details', '')}", transform=card_axis.transAxes, fontsize=8.3, weight="bold", va="top")
-    card_axis.text(0.06, 0.145, text["limitations"], transform=card_axis.transAxes, fontsize=10, weight="bold", va="top")
-    card_axis.text(0.06, 0.10, text["limitations_text"], transform=card_axis.transAxes, fontsize=7.8,
-                   color=style["colors"]["muted_ink"], va="top", wrap=True)
-    return save_figure(
-        figure, output_dir, "hydrobase-qc-dashboard", language, text["qc_title"], source_results,
-        [
-            {"id": "topology-context", "source": "build_result.artifacts.reaches_vector and subbasins_clipped", "display_transform": "context map only", "palette": "subbasins-water"},
-            {"id": "qc-summary", "source": "validation_result.checks", "display_transform": "counts of existing PASS/WARN/FAIL records", "palette": "qc-status"},
-            {"id": "qc-evidence", "source": "validation_result.checks", "display_transform": "first six existing WARN/FAIL records", "palette": "qc-status"},
-        ], meta["crs"], extent, warnings, status == "success",
-    )
+                      language, source_results, warnings, basin, sub_table):
+    return _render_topology(style, text, status, subbasins, meta, reaches, output_dir,
+                            language, source_results, warnings, basin, sub_table, validation=validation)
 
 
 def run(args: argparse.Namespace) -> tuple[dict, int]:
@@ -352,14 +241,21 @@ def run(args: argparse.Namespace) -> tuple[dict, int]:
     text = TEXT[args.language]
     artifacts = {}
     rendered = []
+    boundary_path = resolve_reference(build.get("inputs", {}).get("basin_boundary"), build_path, "basin boundary")
+    basin_layer = build.get("parameters", {}).get("basin_layer")
+    basin = gpd.read_file(boundary_path, **({"layer": basin_layer} if basin_layer else {}))
+    if basin.empty or basin.crs is None or not basin.geometry.is_valid.all():
+        raise AtlasError("真实流域边界为空、缺少 CRS 或几何无效")
+    basin = basin.to_crs(sub_meta["crs"])
+    morph_sources = {**source_results, "basin_boundary": file_reference(boundary_path)}
     if not scientific_fail:
         artifacts.update(_render_topology(style, text, status, subbasins, sub_meta, reaches, args.output_dir,
-                                          args.language, source_results, warnings))
+                                          args.language, morph_sources, warnings, basin, sub_table))
         artifacts.update(_render_morphometry(style, text, status, subbasins, sub_meta, reaches, sub_table,
-                                             args.output_dir, args.language, source_results, warnings))
+                                             args.output_dir, args.language, morph_sources, warnings, basin))
         rendered.extend(["hydrobase-topology", "hydrobase-morphometry"])
     artifacts.update(_render_dashboard(style, text, status, subbasins, sub_meta, reaches, validation,
-                                       args.output_dir, args.language, source_results, warnings))
+                                       args.output_dir, args.language, morph_sources, warnings, basin, sub_table))
     rendered.append("hydrobase-qc-dashboard")
     result_checks = [
         {"check": "input_hashes", "status": "PASS", "details": "all consumed build and validation artifacts verified"},
@@ -370,7 +266,7 @@ def run(args: argparse.Namespace) -> tuple[dict, int]:
     message = "scientific QC failed; rendered failure dashboard only" if scientific_fail else f"rendered {len(rendered)} fixed atlas templates"
     document = {
         "schema_version": "1.0", "skill": SKILL_REF, "status": status, "message": message,
-        "parameters": {"language": args.language, "templates": rendered, "pixel_size": [2400, 1600]},
+        "parameters": {"language": args.language, "templates": rendered, "pixel_sizes": {template: json.loads((args.output_dir / artifacts[f"{template}_figure"]["path"]).read_text(encoding="utf-8"))["pixel_size"] for template in rendered}},
         "inputs": source_results, "artifacts": artifacts, "checks": result_checks,
         "warnings": warnings, "provenance": provenance(font_name),
     }

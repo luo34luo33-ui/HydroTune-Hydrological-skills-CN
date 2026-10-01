@@ -7,7 +7,7 @@ inputs:
     format: JSON
 outputs:
   - id: calibration_overview
-    description: 收敛轨迹、参数位置、两 split 指标和运行证据总览。
+    description: 收敛轨迹、参数位置和两 split 已有指标总览。
     required: true
     format: PNG, SVG and JSON
   - id: validation_process
@@ -23,7 +23,10 @@ outputs:
     required: true
     format: JSON
 invariants:
-  - 不得重算或替换上游率定与验证指标。
+  - 不得替换上游率定与验证指标；过程图可计算本图 scored 样本 NSE 作为显示诊断。
   - event_collection 的不同事件不得拼接成连续序列。
   - PNG 必须精确为 2400×1600 像素且 SVG 使用同一布局。
   - 散点图只能使用 validation 中 scored=true 的样本。
+  - 所有图白底无图名，轴标题完整，实测黑色实线，模拟颜色各异。
+  - 多模拟序列按显式事件与时间或步号对齐，单位与 validation split 必须一致，不自动插值。
+  - NSE 图例排除 warm-up，记录评分分母及不可用原因。

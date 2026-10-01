@@ -19,7 +19,14 @@ outputs:
     required: true
     format: JSON
 invariants:
-  - PNG 必须精确为 2400×1600 像素，SVG 与 PNG 使用相同布局。
+  - 形态三联图 PNG 宽 2400 像素、高 760–1000 像素自适应；拓扑图 PNG 最长边 2400 像素、另一边自适应；QC 看板同样最长边 2400 像素、另一边自适应，SVG 与 PNG 使用相同布局。
   - build 和 validation 中所有被使用 artifact 必须先通过 SHA-256 检查。
   - 科学 QC FAIL 时只能生成失败 dashboard，且运行退出码必须为 2。
   - 图册不得重新计算水文指标、拓扑检查或失败原因。
+  - 形态三联图读取 build.inputs.basin_boundary 的真实边界，先核验来源，再投影与显示裁切。
+  - 形态三联图白底，三图下方标注 (a)(b)(c)，经纬网与刻度、比例尺、指北针、边界俱全。
+  - 坡度为深蓝至深红渐变，沿用 P98 显示上限且标记溢出；层级为既有 topo_level，不是 Strahler 等级。
+  - 拓扑图名放在文件名；机器 artifact 键保持 hydrobase-topology_*，文件定位通过引用完成。
+  - 拓扑图子流域数量来自唯一 sub_id，灰色子流域边界来自既有栅格 ID，仅用于显示。
+  - QC 看板检查汇总放在主图空白处；没有 WARN 或 FAIL 时不显示重要证据及无异常提示。
+  - QC 看板删除图内限制说明，科学 QC FAIL 保留红色 QC FAILED 和失败证据。

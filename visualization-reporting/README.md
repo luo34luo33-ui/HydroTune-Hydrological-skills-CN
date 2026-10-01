@@ -4,7 +4,7 @@
 
 ## 边界
 
-- 指标和诊断证据的核心计算归入 `evaluation-diagnostics`。
+- 性能指标的核心计算归入 `evaluation-diagnostics`；报告模块可执行显式口径下的描述统计、显著峰计数和过程偏差摘要，不重算 NSE 等性能指标。
 - 空间拓扑构建归入 `spatial-analysis`。
 - 为报告准备的模拟结果聚合归入 `post-processing`。
 - 可视化不得为展示效果改写科学结论。
@@ -51,10 +51,22 @@
 
 该 Skill 不重算指标、不重新率定、不拼接独立事件，也不根据 validation 结果重新选择参数。
 
-## 固定图册规范
+## 研究报告与独立审查
 
-- 空间、洪水事件和率定图册样式版本分别为 `hydrotune.spatial-atlas.v1`、`hydrotune.flood-event-atlas.v1` 和 `hydrotune.model-calibration-atlas.v1`；三者完全离线、可复现。
-- 每张图包含 `2400×1600 px` PNG、SVG 与 `figure.json`。
+`generate-timeseries-data-processing-report` 汇总时序资料、洪水数量、洪峰/洪量规模分布、显著单峰与多峰比例及事件总体特征。参数显式提供，不重提取事件。
+
+`generate-spatial-data-processing-report` 汇总半分布式空间基础、子流域数量与面积、河段数量与长度、上下游拓扑及空间单元映射，不重新构建空间成果。
+
+`generate-hydrological-study-report` 仅要求模拟与评价，prepare 整理总体指标和 NSE 最低事件过程，Agent 编写条件性解释，finalize 渲染报告。率定/验证、连续/事件、warm-up/scored 分开。
+
+`review-hydrological-study-report` 独立重读上游，审查三类报告的统计、表图与论述，未完成 Agent 语义审查不得整体通过。
+
+正文和业务汇总聚焦水文结论与限制；哈希、字段定位和完整核验记录仅保留机器附件。首版输出 Markdown、JSON、CSV 与静态图，不提供 DOCX/PDF。
+
+## 图件文件规范
+
+- DEM 图册使用 `hydrotune.dem-hydrology-atlas.v2`：白底、无主副标题、内置图例与色标、流域边界裁切，中文宋体、英文 Times New Roman。洪水图册使用 `hydrotune.flood-event-atlas.v2`：白底论文版式、图内三项指标摘要、黑灰过程线、红色洪峰，可叠加已确认流域平均雨量。率定图册使用 `hydrotune.model-calibration-atlas.v2`：白底无图名，实测黑线，支持多模拟及后处理对比，图例显示本场评分样本 NSE。HydroBase 形态三联图使用 `hydrotune.hydrobase-morphometry.v2`（白底三联地图、下方图名、经纬网、比例尺、指北针、真实流域边界）；拓扑图使用 `hydrotune.hydrobase-topology.v2`（紧凑白底主图、内置图例、经纬网、真实流域及浅灰子流域边界）；QC 看板使用 `hydrotune.hydrobase-qc-dashboard.v2`（主图内检查汇总、异常证据按需显示）；均完全离线、可复现。
+- 每张图包含 PNG、SVG 与 `figure.json`；DEM v2 PNG 最长边为 2400 px，另一边按流域长宽比调整；洪水 v2 为 `2400×1200 px`，其他图册保留 `2400×1600 px`。
 - PNG 面向屏幕、文档和汇报插图，不绑定 A4；SVG 用于无限缩放、排版和印刷。
 - 中英文只改变文字，不改变色带、布局或数据表达。
 - 不使用彩虹色带、在线瓦片、3D 地形、装饰性阴影或任意主题参数。

@@ -1,0 +1,27 @@
+{
+  "template_version": "hydrotune.hydrobase-morphometry.v2",
+  "width_inches": 12,
+  "dpi": 200,
+  "height_range_inches": [
+    3.8,
+    5.0
+  ],
+  "font_family": [
+    "Times New Roman",
+    "SimSun"
+  ],
+  "tick_size": 13,
+  "caption_size": 17,
+  "colorbar_size": 14,
+  "area_palette": "viridis",
+  "slope_colors": [
+    "#053061",
+    "#2166AC",
+    "#67A9CF",
+    "#F7F7F7",
+    "#EF8A62",
+    "#B2182B",
+    "#67001F"
+  ],
+  "level_palette": "plasma"
+}

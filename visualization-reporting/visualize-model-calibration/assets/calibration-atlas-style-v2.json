@@ -1,0 +1,52 @@
+{
+  "template_version": "hydrotune.model-calibration-atlas.v2",
+  "canvas": {
+    "width_px": 2400,
+    "height_px": 1600,
+    "figsize_inches": [
+      12,
+      8
+    ],
+    "dpi": 200,
+    "background": "#FFFFFF",
+    "panel_background": "#FFFFFF"
+  },
+  "typography": {
+    "zh": [
+      "Times New Roman",
+      "SimSun"
+    ],
+    "en": [
+      "Times New Roman",
+      "SimSun"
+    ],
+    "title_size": 20,
+    "body_size": 16,
+    "small_size": 14,
+    "label_size": 18,
+    "legend_size": 16
+  },
+  "colors": {
+    "ink": "#000000",
+    "muted": "#000000",
+    "observed": "#000000",
+    "simulated": "#0072B2",
+    "precipitation": "#6EA9C6",
+    "calibration": "#27628A",
+    "validation": "#C47A16",
+    "warmup": "#EEEEEE",
+    "reference": "#555555",
+    "grid": "#DDDDDD",
+    "warning": "#C47A16"
+  },
+  "simulation_palette": [
+    "#0072B2",
+    "#D55E00",
+    "#009E73",
+    "#CC79A7",
+    "#E69F00",
+    "#56B4E9",
+    "#7B3294",
+    "#8C564B"
+  ]
+}

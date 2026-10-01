@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrotune.local/semi-distributed-swat-config/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "time", "swat", "initial", "reach_params_by_id", "parameter_overrides", "warmup_steps", "simulation"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_seconds", "timezone", "timestamp_meaning"],
+      "properties": {
+        "step_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "timezone": {"type": "string", "minLength": 1},
+        "timestamp_meaning": {"const": "interval_end"}
+      }
+    },
+    "swat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "cn_mode", "channel_profile"],
+      "properties": {
+        "profile": {"enum": ["source_port", "simplified"]},
+        "cn_mode": {"enum": ["dynamic", "static"]},
+        "channel_profile": {"enum": ["linear_storage", "muskingum"]},
+        "soil_slug_mm": {"type": "number", "exclusiveMinimum": 0},
+        "cn_froz": {"type": "number", "minimum": 0, "maximum": 0.1}
+      }
+    },
+    "initial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soil_fraction"],
+      "properties": {
+        "soil_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "canopy_mm": {"type": "number", "minimum": 0},
+        "surface_lag_mm": {"type": "number", "minimum": 0},
+        "lateral_lag_mm": {"type": "number", "minimum": 0},
+        "aquifer_storage_mm": {"type": "number", "minimum": 0},
+        "aquifer_baseflow_mm": {"type": "number", "minimum": 0},
+        "channel_storage_m3": {"type": "number", "minimum": 0}
+      }
+    },
+    "reach_params_by_id": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[1-9][0-9]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["musk_k_hr", "musk_x", "ttime_hr", "scoef", "trans_loss_m3_day", "evap_m3_day"],
+          "properties": {
+            "musk_k_hr": {"type": "number", "exclusiveMinimum": 0},
+            "musk_x": {"type": "number", "minimum": 0, "maximum": 0.5},
+            "ttime_hr": {"type": "number", "exclusiveMinimum": 0},
+            "scoef": {"type": "number", "minimum": 0, "maximum": 1},
+            "trans_loss_m3_day": {"type": "number", "minimum": 0},
+            "evap_m3_day": {"type": "number", "minimum": 0}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "parameter_overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cn2": {"type": "number", "minimum": 30, "maximum": 100},
+        "canmx_mm": {"type": "number", "minimum": 0, "maximum": 50},
+        "brt": {"type": "number", "minimum": 0, "maximum": 1},
+        "latq_co": {"type": "number", "minimum": 0, "maximum": 1},
+        "lat_ttime_days": {"type": "number", "minimum": 0.01, "maximum": 200},
+        "perco_lim": {"type": "number", "minimum": 0, "maximum": 1},
+        "cn3_swf": {"type": "number", "minimum": 0, "maximum": 1},
+        "esco": {"type": "number", "minimum": 0, "maximum": 1},
+        "simplified_ep_frac": {"type": "number", "minimum": 0, "maximum": 1},
+        "alpha_bf": {"type": "number", "minimum": 0.001, "maximum": 1},
+        "gw_seep_frac": {"type": "number", "minimum": 0, "maximum": 1},
+        "musk_k_hr": {"type": "number", "minimum": 0.1, "maximum": 720},
+        "musk_x": {"type": "number", "minimum": 0, "maximum": 0.5}
+      }
+    },
+    "warmup_steps": {"type": "integer", "minimum": 0},
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "minLength": 1},
+        "end": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

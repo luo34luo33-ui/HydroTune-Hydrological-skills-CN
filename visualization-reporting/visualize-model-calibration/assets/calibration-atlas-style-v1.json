@@ -1,6 +1,0 @@
-{
-  "template_version": "hydrotune.model-calibration-atlas.v1",
-  "canvas": {"width_px": 2400, "height_px": 1600, "figsize_inches": [12, 8], "dpi": 200, "background": "#F7F6F2", "panel_background": "#FCFBF8"},
-  "typography": {"zh": ["Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "DejaVu Sans"], "en": ["DejaVu Sans", "Arial", "Liberation Sans"], "title_size": 20, "body_size": 10, "small_size": 8},
-  "colors": {"ink": "#17232D", "muted": "#66717A", "observed": "#17232D", "simulated": "#287A6A", "precipitation": "#6EA9C6", "calibration": "#27628A", "validation": "#C47A16", "warmup": "#E5E1D8", "reference": "#B33A32", "grid": "#D8D6D0", "warning": "#C47A16"}
-}

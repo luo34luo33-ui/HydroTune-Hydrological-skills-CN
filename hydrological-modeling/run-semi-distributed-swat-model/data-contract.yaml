@@ -1,0 +1,332 @@
+schema_version: "1.0"
+skill: hydrological-modeling/run-semi-distributed-swat-model
+inputs:
+  - id: topology_result
+    description: build-hydrological-topology 的 result.json，引用带 SHA-256 的子流域、河段和拓扑表。
+    required: true
+    format: JSON
+  - id: topology_qc_result
+    description: validate-hydrological-topology 的 result.json，必须引用同一构建结果且 expected_outlets 为 1。
+    required: true
+    format: JSON
+  - id: hru_table
+    description: 显式 HRU 属性表；每行一个 HRU，必须给出面积、CN2、逐层土壤水参数与含水层参数。
+    required: true
+    format: UTF-8 CSV（# 开头为注释行）
+    variables:
+      - name: hru_id
+        semantics: HRU 标识符，必须唯一；仅用于结果与溯源标签。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失或重复。
+      - name: sub_id
+        semantics: 所属 HydroBase 子流域正整数标识，用于把 HRU 面积汇到一处局地产流。
+        units: dimensionless
+        spatial_unit: subbasin
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须存在于 subbasins.csv。
+      - name: area_km2
+        semantics: HRU 面积，同一子流域内之和必须等于 subbasins.csv 的 area_km2。
+        units: km2
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 不允许缺失、零或负值。
+      - name: cn2
+        semantics: 常态土壤水分条件下的 SCS 曲线数 II。
+        units: dimensionless
+        spatial_unit: hru
+        time_step: static
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须显式给出。
+      - name: soil_%i_thickness_mm
+        semantics: 第 i 层土层厚度（mm），土层储量字段均为扣除凋萎点后的水量。
+        units: mm
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 每层五个字段必须齐备；土层索引自 1 连续编号。
+      - name: soil_%i_fc_mm
+        semantics: 第 i 层田间持水量（mm H2O）。
+        units: mm
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 同 soil_%i_thickness_mm。
+      - name: soil_%i_ul_mm
+        semantics: 第 i 层饱和储水量（mm H2O），必须不小于 fc。
+        units: mm
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 同 soil_%i_thickness_mm。
+      - name: soil_%i_wp_mm_per_mm
+        semantics: 第 i 层凋萎点含水量（mm H2O / mm 土层），V1 仅参与记录。
+        units: mm/mm
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 同 soil_%i_thickness_mm。
+      - name: soil_%i_ksat_mm_hr
+        semantics: 第 i 层饱和导水率，用于渗漏与侧向流。
+        units: mm/hr
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 同 soil_%i_thickness_mm；必须为正。
+      - name: aquifer_alpha
+        semantics: 含水层基流退水系数（`alpha_bf`）。
+        units: 1/day
+        spatial_unit: hru
+        time_step: daily
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: aquifer_seep_frac
+        semantics: 含水层补给中漏失到深层的比例（`gw_seep_frac`）。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失，取值范围 [0,1]；默认 0 表示无深部漏失。
+      - name: aquifer_specific_yield
+        semantics: 给水度，用于把含水层储量换算为地下水位埋深。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: aquifer_dep_bot_m
+        semantics: 含水层底板埋深（m）。
+        units: m
+        spatial_unit: hru
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: aquifer_flo_min_m
+        semantics: 基流触发的最大允许水位埋深（m），水位更深时停止出流。
+        units: m
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值非负。
+      - name: aquifer_revap_co
+        semantics: 地下水再蒸发系数（V1 实现：水位浅于 revap_min_m 时按 PET 比例抽取）。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；默认 0 表示无再蒸发。
+      - name: aquifer_revap_min_m
+        semantics: 再蒸发允许的含水层最大水位埋深（m）。
+        units: m
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值非负。
+      - name: canmx_mm
+        semantics: 日最大冠层截留容量（mm）；adapted，无叶面积动态。
+        units: mm
+        spatial_unit: hru
+        time_step: daily
+        state_or_flux: state
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 不允许缺失；取值非负。
+      - name: brt
+        semantics: 坡面滞后储库的日出流比例。
+        units: dimensionless
+        spatial_unit: hru
+        time_step: daily
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]。
+      - name: latq_co
+        semantics: 侧向流系数，与导水率、坡度、坡长共同决定侧向流出流。
+        units: dimensionless
+        spatial_unit: hru
+        time_step: daily
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]。
+      - name: lat_ttime_days
+        semantics: 侧向流传播时间（day），换算为指数出流系数。
+        units: day
+        spatial_unit: hru
+        time_step: daily
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: slope_m_m
+        semantics: HRU 平均坡度（m/m），仅用于侧向流计算。
+        units: m/m
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: lat_len_m
+        semantics: 侧向流坡长（m）。
+        units: m
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；必须为正。
+      - name: perco_lim
+        semantics: 最底层渗漏折减系数。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]。
+      - name: cn3_swf
+        semantics: SCS 形状系数调整量，把 CN-I 含水率拉向 CN-III。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]。
+      - name: esco
+        semantics: 土壤蒸发补偿因子。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]。
+      - name: ep_frac
+        semantics: 再蒸发后剩余 PET 分配给植物蒸腾的比例；率定键为 `simplified_ep_frac`。
+        units: dimensionless
+        spatial_unit: hru
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失；取值范围 [0,1]；该分量是 replaced 实现，不是 SWAT+ 原始 LAI 分配。
+  - id: forcing
+    description: 每个 time/sub_id 恰好一行的逐步降雨和蒸发能力长表；本 Skill 仅接受日尺度，亚日尺度必须先显式聚合。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: P_mm
+        semantics: 对应子流域和时间间隔的累计降雨深度。
+        units: mm/step
+        spatial_unit: subbasin
+        time_step: config.time.step_seconds 显式指定
+        timezone: config.time.timezone 显式指定
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 不允许缺失、重复或隐式填零。
+      - name: E0_mm
+        semantics: 对应子流域和时间间隔的累计蒸发能力深度。
+        units: mm/step
+        spatial_unit: subbasin
+        time_step: config.time.step_seconds 显式指定
+        timezone: config.time.timezone 显式指定
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 不允许缺失、重复或隐式填零。
+      - name: time
+        semantics: 带 UTC 偏移的区间末端时间戳。
+        units: datetime
+        time_step: config.time.step_seconds 显式指定
+        timezone: config.time.timezone 显式指定
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 不允许缺失或重复。
+  - id: parameter_set
+    description: 时间、SWAT 忠实度开关、逐河段河道参数、初始状态、参数覆盖、预热期与模拟期间的完整配置。
+    required: true
+    format: JSON or YAML
+  - id: boundary_inflow
+    description: 可选 time/reach_id/Q_m3s 长表；只能注入承接本地产流的河段，在到达该河段演算之前加入。
+    required: false
+    format: UTF-8 CSV
+    variables:
+      - name: Q_m3s
+        semantics: 指定河段在区间末端的外部边界入流率。
+        units: m3/s
+        spatial_unit: reach
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 提供的行不允许缺失；未列出的时段/河段视为无入流。
+outputs:
+  - id: hru_process
+    description: 每个 HRU 逐时步降雨、实际 ET、地表/侧向/基流水源深度、土壤水与含水层状态，以及该 HRU 的逐步水量平衡残差。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: P_mm
+        semantics: HRU 所在子流域的日降雨深度。
+        units: mm/step
+        spatial_unit: hru
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 科学 QC 失败时不生成有效序列。
+      - name: AET_mm
+        semantics: 实际蒸散发（冠层蒸发 + 土壤蒸发 + 植物蒸腾）。
+        units: mm/step
+        spatial_unit: hru
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 科学 QC 失败时不生成有效序列。
+      - name: baseflow_mm
+        semantics: 含水层基流出流深度。
+        units: mm/step
+        spatial_unit: hru
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 科学 QC 失败时不生成有效序列。
+      - name: residual_mm
+        semantics: HRU 控制体逐步水盆残差（初始储量+降雨-出流-终储量）。
+        units: mm
+        spatial_unit: hru
+        state_or_flux: flux
+        accumulated_or_instantaneous: accumulated
+        missing_value_semantics: 超容差时整个运行判为失败。
+  - id: subbasin_process
+    description: 每个子流域逐时步三水源体积、本地入河流量、边界入流、上游入流、出流与子流域控制体残差。
+    required: true
+    format: UTF-8 CSV
+  - id: reach_process
+    description: 每个河段逐时步本地与边界入流、上游入流、总入流、出流、河道损失和末端储量。
+    required: true
+    format: UTF-8 CSV
+  - id: outlet_flow
+    description: 唯一流域出口的逐时步出流体积与日均流量，含 is_warmup 标记。
+    required: true
+    format: UTF-8 CSV
+    variables:
+      - name: Q_m3s
+        semantics: 拓扑驱动后的唯一出口总流量（当日出流体积 / 86400 s）。
+        units: m3/s
+        spatial_unit: outlet_reach
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 科学 QC 失败时不生成有效模拟序列。
+  - id: water_balance
+    description: HRU / 河段 / 子流域 / 流域四级残差、阈值、最大残差与流域记账量。
+    required: true
+    format: JSON
+  - id: model_config
+    description: 运行时完整配置快照。
+    required: true
+    format: JSON
+  - id: run_result
+    description: 参数、输入输出哈希、QC、预警与 provenance（含 NOT VERIFIED 与 LGPL 溯源）。
+    required: true
+    format: JSON
+warmup_period:
+  required: true
+  semantics: config.warmup_steps 指定前 N 个时步；保留在输出并标记，不属于模拟期间。注意源工程的 warmup_days 是整段重复运行，本 Skill 采用前 N 步语义。
+simulation_period:
+  required: true
+  semantics: config.simulation.start/end 必须等于预热后首步和序列末步，均为带偏移区间末端时间。
+invariants:
+  - 每个子流域面积只用于一次局地产流，且必须来自经验证 HydroBase。
+  - 每个子流域恰有一个承接河段；整个流域恰有一个最终出口。
+  - 同一子流域内 HRU 面积之和必须等于 subbasins.csv 的 area_km2（相对容差 1e-6）。
+  - 每个 time/sub_id 恰有一条 forcing，时间轴严格等间隔日序列。
+  - 仅支持 step_seconds=86400；亚日尺度必须先在上游处理或显式 opt-in 聚合。
+  - 河道出流体积与末端储量差不得解释为损失，已单独给出 loss_m3_day 与 storage_m3。
+  - 参数、状态、输入和输出均有限；缺失或非法数值不静默修复。
+  - parameter_overrides 是全局广播，逐个 HRU/河段微调不在 V1 范围内。

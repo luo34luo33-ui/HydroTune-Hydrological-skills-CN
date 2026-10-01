@@ -1,0 +1,68 @@
+{
+  "template_version": "hydrotune.dem-hydrology-atlas.v2",
+  "canvas": {
+    "dpi": 200,
+    "background": "#FFFFFF",
+    "panel_background": "#FFFFFF",
+    "longest_edge_px": 2400
+  },
+  "typography": {
+    "zh": [
+      "SimSun"
+    ],
+    "en": [
+      "Times New Roman"
+    ],
+    "body_size": 13,
+    "legend_size": 16,
+    "small_size": 12,
+    "colorbar_label_size": 15,
+    "colorbar_tick_size": 13
+  },
+  "colors": {
+    "ink": "#17232D",
+    "muted_ink": "#5B6770",
+    "terrain": [
+      "#E7E2C6",
+      "#B9C9A3",
+      "#7F9A78",
+      "#82735F",
+      "#E8E6E0"
+    ],
+    "water": [
+      "#9DCBDA",
+      "#68A9C4",
+      "#2F82AC",
+      "#176B9A",
+      "#083D66"
+    ],
+    "subbasins": [
+      "#DCE8E5",
+      "#E8DFC8",
+      "#D7DDED",
+      "#E5D4D0",
+      "#D9E5C7",
+      "#E2D8EA",
+      "#CFE3E8",
+      "#E9E2D2",
+      "#D8E0D0",
+      "#E5D7DF"
+    ],
+    "pass": "#287A53",
+    "warn": "#C47A16",
+    "fail": "#B33A32",
+    "boundary": "#20282E",
+    "analysis_extent": "#B06A24"
+  },
+  "line_widths": {
+    "basin": 2.2,
+    "analysis_extent": 1.6,
+    "stream_base": 0.7,
+    "stream_step": 0.9,
+    "arrow": 0.8
+  },
+  "layout": {
+    "map_padding": 0.07,
+    "frame_margins": [0.035, 0.045, 0.015, 0.015]
+  }
+}

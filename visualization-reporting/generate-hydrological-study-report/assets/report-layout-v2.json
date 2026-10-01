@@ -1,0 +1,98 @@
+{
+  "schema_version": "2.0",
+  "sections": {
+    "timeseries": [
+      [
+        "overview",
+        "资料与时段概况",
+        "Data overview"
+      ],
+      [
+        "sizes",
+        "洪水规模分布",
+        "Flood sizes"
+      ],
+      [
+        "shapes",
+        "洪峰形态",
+        "Peak shapes"
+      ],
+      [
+        "events",
+        "事件总体特征",
+        "Event characteristics"
+      ],
+      [
+        "limitations",
+        "限制与建议",
+        "Limitations"
+      ]
+    ],
+    "spatial": [
+      [
+        "overview",
+        "流域概况",
+        "Basin overview"
+      ],
+      [
+        "subbasins",
+        "空间划分",
+        "Subbasins"
+      ],
+      [
+        "reaches",
+        "河网特征",
+        "Reaches"
+      ],
+      [
+        "topology",
+        "拓扑结构",
+        "Topology"
+      ],
+      [
+        "model-inputs",
+        "模型空间输入概况",
+        "Spatial model inputs"
+      ],
+      [
+        "limitations",
+        "限制与建议",
+        "Limitations"
+      ]
+    ],
+    "simulation": [
+      [
+        "overview",
+        "总体结论",
+        "Overall conclusions"
+      ],
+      [
+        "evaluation",
+        "评价范围与总体指标",
+        "Overall performance"
+      ],
+      [
+        "calibration",
+        "率定与验证表现",
+        "Calibration and validation"
+      ],
+      [
+        "worst",
+        "NSE 最低事件",
+        "Lowest NSE events"
+      ],
+      [
+        "discussion",
+        "可能误差来源",
+        "Possible error sources"
+      ],
+      [
+        "limitations",
+        "限制与建议",
+        "Limitations"
+      ]
+    ]
+  },
+  "large_network_node_limit": 60,
+  "description": "Fixed analysis-first report chapters; IDs stable for independent review."
+}

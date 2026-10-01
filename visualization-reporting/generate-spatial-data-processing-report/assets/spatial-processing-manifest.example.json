@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "title": "半分布式空间数据处理报告",
+  "language": "zh",
+  "required_sources": [
+    "topology"
+  ],
+  "sources": [
+    {
+      "id": "topology",
+      "stage": "spatial",
+      "result": "topology/result.json"
+    }
+  ]
+}

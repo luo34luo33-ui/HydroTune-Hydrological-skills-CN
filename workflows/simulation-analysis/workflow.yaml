@@ -88,11 +88,13 @@ stages:
         - 每个假设均列出支持证据、反证和限制
         - 相关性、偏差和排名未被写成确定因果
   - id: structured_report
-    type: abstract
-    description: 生成区分事实、证据、推断、建议和待确认事项的报告。
+    type: skill
+    skill_ref: visualization-reporting/generate-hydrological-study-report
+    description: 汇总总体指标与 NSE 最低事件，使用过程证据提出条件性误差解释。
     depends_on:
       - evidence_hypothesis_synthesis
     inputs:
+      - study_manifest_with_simulation_evaluation_results
       - baseline_metrics
       - diagnostic_hypotheses
       - suggested_next_analyses

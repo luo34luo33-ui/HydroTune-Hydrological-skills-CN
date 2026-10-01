@@ -23,6 +23,7 @@ metadata:
 3. 将一致出现的差异总结为模式，并为每个假设列出支持证据、反证与不确定性。
 4. 只提出有界的可能原因，不把指标、相关性或排名直接解释为因果。
 5. 报告可以建议返回数据预处理或模型构建，但不得自动修改输入、模型或参数。
+6. 模拟和评价成果可用时，使用 `visualization-reporting/generate-hydrological-study-report` 的 prepare → Agent 论述 → finalize 流程形成研究报告。保留已有诊断证据，汇总总体指标和 NSE 最低事件过程，提出条件性解释，不重算性能指标或确定因果。独立审查按需调用 `visualization-reporting/review-hydrological-study-report`，不得自动重跑上游。
 
 按需阅读[使用指南](usage-guide.md)，并以[机器可读工作流](workflow.yaml)定义的证据链和反馈目标为准。
 

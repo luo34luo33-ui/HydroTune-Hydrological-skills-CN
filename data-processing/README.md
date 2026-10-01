@@ -23,6 +23,8 @@ prepare-discharge-timeseries
 - `prepare-model-forcing-timeseries`：把降雨或已有 PET/E0 站点序列按显式单位、时区和原始值语义整理为 mm/步长表。
 - `derive-potential-evapotranspiration`：从完整日或小时气象量计算 FAO-56 ETo，只有显式映射时另输出 PET/E0。
 
+已完成一项或多项处理后，可使用 `visualization-reporting/generate-data-processing-report` 输出数据处理结果报告、来源台账、QC 清单与证据和缺口。不要求运行模拟、率定或评价；报告不替代处理步骤本身，也不自行宣称所有数据建模就绪。
+
 缺测默认停止。只有显式选择时才允许受最大缺口约束的内部插值或首尾裁切；不会外推，也不会根据附加列名猜测雨量、蒸发或上下游语义。事件配置中的数值必须全部出现，仓库所带配置只用于复现参考源码，不是通用科学默认值。
 
 ## 示例安装

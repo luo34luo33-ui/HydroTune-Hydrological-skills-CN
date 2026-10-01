@@ -24,6 +24,7 @@
 |---|---|---|
 | `run-lumped-xaj-model` | 集总式新安江三水源产汇流：三层蒸发、蓄满产流、三水源划分、坡面与河网调蓄。支持连续序列与逐场次两种模式 | `Qt`（河网入口流量）与全部状态列 |
 | `run-semi-distributed-xaj-model` | HydroBase 子流域逐单元新安江产流，按河段拓扑演算三水源与边界入流 | 子流域、河段过程及唯一出口流量 |
+| `run-semi-distributed-swat-model` | HydroBase 子流域内的显式 HRU 逐个跑 SCS-CN 产流、三层 ET、土壤水再分配与含水层基流，按河段 DAG 演算至唯一出口；日尺度，提供四级水量平衡审计 | HRU、子流域、河段过程、唯一出口流量与水量平衡报告 |
 | `route-muskingum-channel` | 马斯京根河道演算：单河段演进、单元河网多级串联、上游水库出库演进、多路出流相加 | 演进后出流与合并后的 `Q_total` |
 | `run-lumped-dhf-model` | 集总式大伙房（DHF）模型：18 参数、双层蓄水容量产流、蒸发亏缺分配与经验 Gamma 型单位线汇流，产汇流自包含 | 流域出口流量 `Q` 与产流分量、状态列 |
 | `run-lumped-hbv-model` | 集总式简化 HBV：9 参数、蓄满产流加三出口线性水库（含层间交换），无雪模块 | 流域出口流量 `Q` 与土壤/响应层状态列 |
@@ -40,6 +41,8 @@ run-lumped-xaj-model  ->  route-muskingum-channel  ->  post-processing / evaluat
       Qt                        Q_total
 validated HydroBase + subbasin forcing -> run-semi-distributed-xaj-model -> evaluation-diagnostics
                                                outlet Q
+validated HydroBase + HRU 表 + daily forcing -> run-semi-distributed-swat-model -> evaluation-diagnostics
+                                                        outlet Q, water balance
 run-lumped-sacsma-model ->  route-lohmann-channel  --->  evaluation-diagnostics
    SURF / BASE            routed_direct + routed_base = Q_total
 run-lumped-dhf-model  --------------------------------->  evaluation-diagnostics
@@ -60,7 +63,7 @@ derive-topmodel-terrain-inputs -> run-lumped-topmodel ----> evaluation-diagnosti
 
 ### 命名约定
 
-`run-lumped-xaj-model` 中的 `lumped` 显式声明空间离散方式。半分布式新安江是并列 Skill，读取 HydroBase 空间单元与拓扑。后续模型共用的 ID、时空单位和证据约定见[半分布式模型输入契约 v1](../resources/semi-distributed-model-input-v1.md)。
+`run-lumped-xaj-model` 中的 `lumped` 显式声明空间离散方式。半分布式新安江与半分布式 SWAT 是并列 Skill，读取 HydroBase 空间单元与拓扑；半分布式 SWAT 还要求显式 HRU 属性表，不由栅格自动划分 HRU。后续模型共用的 ID、时空单位和证据约定见[半分布式模型输入契约 v1](../resources/semi-distributed-model-input-v1.md)。
 
 ## 交叉边界
 

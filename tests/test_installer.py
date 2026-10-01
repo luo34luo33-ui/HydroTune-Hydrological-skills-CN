@@ -46,9 +46,9 @@ def test_default_dry_run_lists_skills_and_workflows_without_writes(
     assert result.stdout.count("将安装: hydro-workflow-") == 3
     assert result.stdout.count("将安装: hydro-data-processing-") == 5
     assert result.stdout.count("将安装: hydro-spatial-analysis-") == 6
-    assert result.stdout.count("将安装: hydro-visualization-reporting-") == 4
+    assert result.stdout.count("将安装: hydro-visualization-reporting-") == 8
     assert result.stdout.count("将安装: hydro-model-calibration-") == 5
-    assert result.stdout.count("将安装: hydro-hydrological-modeling-") == 10
+    assert result.stdout.count("将安装: hydro-hydrological-modeling-") == 11
     assert result.stdout.count("将安装: hydro-post-processing-") == 2
     assert result.stdout.count("将安装: hydro-evaluation-diagnostics-") == 3
     assert not target.exists()
@@ -67,13 +67,13 @@ def test_category_filter_excludes_workflows(
     )
     assert result.returncode == 0, result.stderr
     installed = sorted(path.name for path in target.iterdir() if path.is_dir())
-    assert installed == [
+    assert installed == sorted([
         "hydro-data-processing-derive-potential-evapotranspiration",
         "hydro-data-processing-extract-flood-events",
         "hydro-data-processing-prepare-discharge-timeseries",
         "hydro-data-processing-prepare-model-forcing-timeseries",
         "hydro-data-processing-separate-baseflow-eckhardt",
-    ]
+    ])
     assert not any(name.startswith("hydro-workflow-") for name in installed)
 
 
@@ -92,14 +92,14 @@ def test_category_filter_can_explicitly_include_workflows(
     )
     assert result.returncode == 0, result.stderr
     installed = sorted(path.name for path in target.iterdir() if path.is_dir())
-    assert installed == [
+    assert installed == sorted([
         "hydro-data-processing-derive-potential-evapotranspiration",
         "hydro-data-processing-extract-flood-events",
         "hydro-data-processing-prepare-discharge-timeseries",
         "hydro-data-processing-prepare-model-forcing-timeseries",
         "hydro-data-processing-separate-baseflow-eckhardt",
         "hydro-workflow-simulation-analysis",
-    ]
+    ])
 
 
 def test_spatial_category_installs_six_atomic_skills(
@@ -115,14 +115,14 @@ def test_spatial_category_installs_six_atomic_skills(
     )
     assert result.returncode == 0, result.stderr
     installed = sorted(path.name for path in target.iterdir() if path.is_dir())
-    assert installed == [
+    assert installed == sorted([
         "hydro-spatial-analysis-aggregate-forcing-to-model-units",
         "hydro-spatial-analysis-build-hydrological-topology",
         "hydro-spatial-analysis-derive-topmodel-terrain-inputs",
         "hydro-spatial-analysis-extract-dem-stream-network",
         "hydro-spatial-analysis-prepare-dem-analysis-grid",
         "hydro-spatial-analysis-validate-hydrological-topology",
-    ]
+    ])
     for skill_dir in target.iterdir():
         if skill_dir.is_dir():
             assert any((skill_dir / "scripts").glob("*.py"))
@@ -141,20 +141,20 @@ def test_model_calibration_category_installs_five_self_contained_skills(
     )
     assert result.returncode == 0, result.stderr
     installed = sorted(path.name for path in target.iterdir() if path.is_dir())
-    assert installed == [
+    assert installed == sorted([
         "hydro-model-calibration-calibrate-model-de",
         "hydro-model-calibration-calibrate-model-ga",
         "hydro-model-calibration-calibrate-model-pso",
         "hydro-model-calibration-calibrate-model-sce-ua",
         "hydro-model-calibration-calibrate-model-two-stage",
-    ]
+    ])
     for skill_dir in target.iterdir():
         if skill_dir.is_dir():
             assert (skill_dir / "scripts" / "_calibration_common.py").is_file()
             assert any((skill_dir / "scripts").glob("calibrate_model_*.py"))
 
 
-def test_visualization_category_installs_four_self_contained_skills(
+def test_visualization_category_installs_eight_self_contained_skills(
     repo_root: Path, tmp_path: Path, utf8_env: dict[str, str]
 ) -> None:
     target = tmp_path / "图册 skills（测试）"
@@ -167,20 +167,48 @@ def test_visualization_category_installs_four_self_contained_skills(
     )
     assert result.returncode == 0, result.stderr
     installed = sorted(path.name for path in target.iterdir() if path.is_dir())
-    assert installed == [
+    assert installed == sorted([
+        "hydro-visualization-reporting-generate-spatial-data-processing-report",
+        "hydro-visualization-reporting-generate-timeseries-data-processing-report",
+        "hydro-visualization-reporting-generate-hydrological-study-report",
+        "hydro-visualization-reporting-review-hydrological-study-report",
         "hydro-visualization-reporting-visualize-dem-hydrology-atlas",
         "hydro-visualization-reporting-visualize-flood-event-atlas",
         "hydro-visualization-reporting-visualize-hydrobase-atlas",
         "hydro-visualization-reporting-visualize-model-calibration",
-    ]
+    ])
     for skill_dir in target.iterdir():
         if skill_dir.is_dir():
-            if "model-calibration" in skill_dir.name:
-                assert (skill_dir / "assets" / "calibration-atlas-style-v1.json").is_file()
+            if "generate-timeseries-data-processing-report" in skill_dir.name:
+                assert (skill_dir / "scripts" / "generate_timeseries_data_processing_report.py").is_file()
+                assert (skill_dir / "scripts" / "_report_common.py").is_file()
+                assert (skill_dir / "assets" / "processing-report.schema.json").is_file()
+                continue
+            elif "generate-spatial-data-processing-report" in skill_dir.name:
+                assert (skill_dir / "scripts" / "generate_spatial_data_processing_report.py").is_file()
+                assert (skill_dir / "assets" / "spatial-processing-manifest.schema.json").is_file()
+                continue
+            elif "hydrological-study-report" in skill_dir.name:
+                assert (skill_dir / "scripts" / "_report_common.py").is_file()
+                assert (skill_dir / "assets" / "study-report.schema.json").is_file()
+                assert (skill_dir / "assets" / "upstream-catalog.json").is_file()
+                continue
+            elif "model-calibration" in skill_dir.name:
+                assert (skill_dir / "assets" / "calibration-atlas-style-v2.json").is_file()
+                assert (skill_dir / "scripts" / "_calibration_plot.py").is_file()
                 assert (skill_dir / "scripts" / "render_model_calibration_atlas.py").is_file()
             elif "flood-event" in skill_dir.name:
-                assert (skill_dir / "assets" / "flood-event-style-v1.json").is_file()
+                assert (skill_dir / "assets" / "flood-event-style-v2.json").is_file()
                 assert (skill_dir / "scripts" / "_event_atlas_common.py").is_file()
+            elif "visualize-hydrobase-atlas" in skill_dir.name:
+                assert (skill_dir / "assets" / "morphometry-style-v2.json").is_file()
+                assert (skill_dir / "assets" / "topology-style-v2.json").is_file()
+                assert (skill_dir / "scripts" / "_topology_plot.py").is_file()
+                assert (skill_dir / "scripts" / "_morphometry_maps.py").is_file()
+                assert (skill_dir / "scripts" / "_morphometry_plot.py").is_file()
+            elif "visualize-dem-hydrology-atlas" in skill_dir.name:
+                assert (skill_dir / "assets" / "atlas-style-v2.json").is_file()
+                assert (skill_dir / "scripts" / "_atlas_common.py").is_file()
             else:
                 assert (skill_dir / "assets" / "atlas-style-v1.json").is_file()
                 assert (skill_dir / "scripts" / "_atlas_common.py").is_file()
@@ -202,7 +230,7 @@ def test_install_rewrites_layout_name_and_links(
     assert (skill_dir / "references" / "usage-guide.md").is_file()
     assert (skill_dir / "references" / "workflow.yaml").is_file()
     manifest = json.loads((target / ".hydrotune-skills-manifest.json").read_text(encoding="utf-8"))
-    assert len(manifest["installed"]) == 38
+    assert len(manifest["installed"]) == 43
 
 
 def test_update_uses_content_hash(
@@ -224,7 +252,33 @@ def test_update_uses_content_hash(
         "hydro-workflow-data-preprocessing"
     ]["sha256"]
     assert after != before
-    assert "跳过 37 个" in update.stdout
+    assert "跳过 42 个" in update.stdout
+
+
+def test_update_retires_managed_old_report_with_recoverable_archive(repo_root, tmp_path, utf8_env):
+    import zipfile
+    target = tmp_path / "installed"
+    assert _run_engine(repo_root, target, "--categories", "visualization-reporting", environment=utf8_env).returncode == 0
+    current = "hydro-visualization-reporting-generate-timeseries-data-processing-report"
+    old = "hydro-visualization-reporting-generate-data-processing-report"
+    (target / current).rename(target / old)
+    (target / old / "personal-note.txt").write_text("preserve my edits", encoding="utf-8")
+    manifest_path = target / ".hydrotune-skills-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["installed"][old] = manifest["installed"].pop(current)
+    manifest["installed"][old]["source"] = "visualization-reporting/generate-data-processing-report"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    preview = _run_engine(repo_root, target, "--categories", "visualization-reporting", "--update", "--dry-run", environment=utf8_env)
+    assert preview.returncode == 0, preview.stderr
+    assert (target / old).exists() and not (target / ".hydrotune-retired-skills").exists()
+    update = _run_engine(repo_root, target, "--categories", "visualization-reporting", "--update", environment=utf8_env)
+    assert update.returncode == 0, update.stderr
+    assert (target / current).is_dir() and not (target / old).exists()
+    after = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert old not in after["installed"] and current in after["installed"]
+    archive = next((target / ".hydrotune-retired-skills").glob("*.zip"))
+    with zipfile.ZipFile(archive) as bundle:
+        assert bundle.read("personal-note.txt") == b"preserve my edits"
 
 
 def test_uninstall_preserves_unrelated_content(

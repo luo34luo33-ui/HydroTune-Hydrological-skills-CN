@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 from jsonschema import Draft202012Validator
 import numpy as np
@@ -239,7 +240,7 @@ def test_flood_atlas_fixed_outputs_schema_hashes_and_tamper_stop(repo_root: Path
     assert [path.name for path in pngs] == ["event-0001-hydrograph.png", "flood-event-overview.png"]
     for png in pngs:
         with Image.open(png) as image:
-            assert image.size == (2400, 1600)
+            assert image.size == (2400, 1200)
     figure_schema = json.loads((repo_root / "resources/schemas/flood-event-figure.schema.json").read_text(encoding="utf-8"))
     for metadata_path in atlas_dir.glob("*.figure.json"):
         Draft202012Validator(figure_schema).validate(json.loads(metadata_path.read_text(encoding="utf-8")))
@@ -265,3 +266,56 @@ def test_flood_atlas_fixed_outputs_schema_hashes_and_tamper_stop(repo_root: Path
     )
     assert rejected.returncode == 1
     assert "SHA-256" in rejected.stderr
+
+
+def test_flood_atlas_rainfall_alignment_units_and_paper_layout(repo_root: Path, tmp_path: Path, monkeypatch) -> None:
+    module = _load_module(repo_root / SCRIPTS["atlas"], "paper_flood_atlas_test")
+    times = pd.date_range("2020-01-01T01:00:00Z", periods=4, freq="h")
+    series = pd.DataFrame({"time": times, "discharge_m3_s": [3, 10, 20, 12], "baseflow_m3_s": [2, 3, 4, 4]})
+    process = series.assign(event_id=1, is_warmup=[True, False, False, False])
+    rain_path, meta_path = tmp_path / "rain.csv", tmp_path / "metadata.json"
+    pd.DataFrame({"time": times - pd.Timedelta(hours=1), "P_mm": [0, 2, 4, 1]}).to_csv(rain_path, index=False)
+    metadata = {"spatial_scope": "basin_mean", "unit": "mm/step", "timestamp_semantics": "interval_start",
+                "timestep_seconds": 3600, "timezone": "UTC"}
+    meta_path.write_text(json.dumps(metadata), encoding="utf-8")
+    args = SimpleNamespace(rainfall=rain_path, rainfall_metadata=meta_path)
+    rain, step, refs = module.load_rainfall(args, series, process, {"parameters": {"timestep_seconds": 3600}})
+    assert rain.time.tolist() == times.tolist()
+    assert rain.P_mm.tolist() == [0, 2, 4, 1] and step == 3600
+    assert set(refs) == {"rainfall", "rainfall_metadata"}
+    plot = sys.modules["_flood_plot"]
+    common = sys.modules["_event_atlas_common"]
+    style = common.load_style(repo_root / SCRIPTS["atlas"])
+    common.configure(style, "zh")
+    captured = {}
+    def capture(*arguments):
+        captured["figure"], captured["layers"] = arguments[0], arguments[7]
+        return {}
+    monkeypatch.setattr(plot, "save_figure", capture)
+    row = SimpleNamespace(event_id=1, start_time=times[1], end_time=times[-1], peak_time=times[2],
+                          peak_flow_m3_s=20, duration_hours=3, total_volume_m3=125000000)
+    plot.render_event(style, module.TEXT["zh"], "warning", row, process, tmp_path, "zh", refs, ["upstream"],
+                      rain=rain, rain_step=step)
+    figure = captured["figure"]
+    axis, rain_axis = figure.axes
+    assert not figure.texts  # no title/subtitle/warning outside the axes
+    assert rain_axis.get_ylim()[0] > rain_axis.get_ylim()[1]
+    assert rain_axis.get_zorder() < axis.get_zorder()
+    assert [bar.get_height() for bar in rain_axis.patches] == [0, 2, 4, 1]
+    assert all(bar.get_alpha() == 0.5 for bar in rain_axis.patches)
+    assert axis.lines[0].get_color() == "black" and axis.lines[0].get_linestyle() == "-"
+    assert axis.lines[1].get_color() == "#555555" and axis.lines[1].get_linestyle() == "--"
+    assert any("1.25 亿立方米" in text.get_text() for text in axis.texts)
+    assert "直接径流" not in " ".join(text.get_text() for text in axis.get_legend().get_texts())
+    assert any("total_volume_m3=125000000" in layer["display_transform"] for layer in captured["layers"])
+    common.plt.close(figure)
+    for key, bad_value in (("unit", "mm/h"), ("spatial_scope", "station"), ("timestep_seconds", 7200)):
+        bad = dict(metadata, **{key: bad_value})
+        meta_path.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(common.AtlasError):
+            module.load_rainfall(args, series, process, {"parameters": {"timestep_seconds": 3600}})
+    meta_path.write_text(json.dumps(metadata), encoding="utf-8")
+    frame = pd.read_csv(rain_path).iloc[:-1]
+    frame.to_csv(rain_path, index=False)
+    with pytest.raises(common.AtlasError, match="未覆盖"):
+        module.load_rainfall(args, series, process, {"parameters": {"timestep_seconds": 3600}})

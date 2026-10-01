@@ -74,8 +74,13 @@ def test_repository_skeleton_is_valid(repo_root: Path) -> None:
         "model-calibration/calibrate-model-sce-ua",
         "model-calibration/calibrate-model-two-stage",
         "visualization-reporting/visualize-model-calibration",
+        "visualization-reporting/generate-hydrological-study-report",
+        "visualization-reporting/generate-timeseries-data-processing-report",
+        "visualization-reporting/generate-spatial-data-processing-report",
+        "visualization-reporting/review-hydrological-study-report",
         "hydrological-modeling/run-lumped-xaj-model",
             "hydrological-modeling/run-semi-distributed-xaj-model",
+        "hydrological-modeling/run-semi-distributed-swat-model",
         "hydrological-modeling/route-muskingum-channel",
         "hydrological-modeling/route-lohmann-channel",
         "hydrological-modeling/run-lumped-dhf-model",
@@ -123,8 +128,13 @@ def test_category_readmes_are_not_discovered_as_skills(repo_root: Path) -> None:
         "model-calibration/calibrate-model-sce-ua",
         "model-calibration/calibrate-model-two-stage",
         "visualization-reporting/visualize-model-calibration",
+        "visualization-reporting/generate-hydrological-study-report",
+        "visualization-reporting/generate-timeseries-data-processing-report",
+        "visualization-reporting/generate-spatial-data-processing-report",
+        "visualization-reporting/review-hydrological-study-report",
         "hydrological-modeling/run-lumped-xaj-model",
             "hydrological-modeling/run-semi-distributed-xaj-model",
+        "hydrological-modeling/run-semi-distributed-swat-model",
         "hydrological-modeling/route-muskingum-channel",
         "hydrological-modeling/route-lohmann-channel",
         "hydrological-modeling/run-lumped-dhf-model",
@@ -146,7 +156,7 @@ def test_valid_atomic_fixture_passes(repo_copy: Path) -> None:
     issues, records = validate_skills(repo_copy)
     assert issues == []
     assert "data-processing/test-skill" in {record.source_ref for record in records}
-    assert len(records) == 36
+    assert len(records) == 41
 
 
 def test_unknown_category_skill_is_rejected(repo_copy: Path) -> None:

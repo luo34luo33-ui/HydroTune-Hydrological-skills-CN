@@ -19,3 +19,7 @@
 - validation 表现不能描述为 calibration 证据。
 - 反馈到上游 workflow 只是一项人工决策建议，本阶段不自动重跑。
 
+已有模型运行和评价成果时，将每个运行与其评价显式写入 study-manifest.json，调用 generate-hydrological-study-report。prepare 产出证据草稿，Agent 编写有引用的论述，finalize 渲染 Markdown/JSON/CSV 报告包；相关输入不齐时保留缺口，不能冒充完整研究报告。
+
+review-hydrological-study-report 是独立后续步骤，包含脚本一致性检查与逐段 Agent 语义审查。未完成语义审查不能整体通过；发现问题只提出修订意见，不触发上游重算。
+

@@ -1,0 +1,13 @@
+# SWAT HRU 属性表示例（3 个 HRU、2 个子流域、每个 HRU 2 个土层）
+#
+# 数值来源：MiniSWAT-RR 0.1.0 的 examples/minimal_basin.yaml（H1、H2 原样沿用，
+# H3 为该示例 S2 的 HRU）。这些数值只用于复现源工程示例行为，
+# **不是通用水文默认值**；实际流域必须由使用者按土壤/土地利用资料显式给出。
+#
+# 单位：面积 km2；深度通量与储量 mm H2O（土层储量均为扣除凋萎点之后的水量）；
+# 导水率 mm/hr；坡度 m/m；侧向流坡长 m；含水层深度 m。
+# 约束：同一 sub_id 内 HRU 的 area_km2 之和必须等于 HydroBase subbasins.csv 的 area_km2。
+hru_id,sub_id,area_km2,cn2,canmx_mm,brt,latq_co,lat_ttime_days,slope_m_m,lat_len_m,perco_lim,cn3_swf,esco,ep_frac,aquifer_alpha,aquifer_seep_frac,aquifer_specific_yield,aquifer_dep_bot_m,aquifer_flo_min_m,aquifer_revap_co,aquifer_revap_min_m,soil_1_thickness_mm,soil_1_fc_mm,soil_1_ul_mm,soil_1_wp_mm_per_mm,soil_1_ksat_mm_hr,soil_2_thickness_mm,soil_2_fc_mm,soil_2_ul_mm,soil_2_wp_mm_per_mm,soil_2_ksat_mm_hr
+H1,1,12.0,60.0,2.0,0.55,0.30,3.0,0.06,60.0,1.0,0.5,0.15,0.55,0.048,0.02,0.06,12.0,12.0,0.0,0.0,300.0,60.0,105.0,0.10,6.0,700.0,120.0,210.0,0.12,2.0
+H2,1,8.0,75.0,1.2,0.60,0.30,2.0,0.04,80.0,1.0,0.5,0.15,0.45,0.060,0.02,0.05,10.0,10.0,0.0,0.0,250.0,45.0,90.0,0.12,4.0,650.0,100.0,180.0,0.14,1.5
+H3,2,20.0,70.0,1.5,0.50,0.30,4.0,0.05,70.0,1.0,0.5,0.15,0.50,0.040,0.02,0.06,12.0,12.0,0.0,0.0,300.0,55.0,100.0,0.11,5.0,600.0,110.0,190.0,0.13,1.8

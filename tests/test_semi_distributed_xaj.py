@@ -111,6 +111,77 @@ def test_branching_network_boundary_and_warmup(tmp_path: Path) -> None:
     assert json.loads((output / "result.json").read_text(encoding="utf-8"))["status"] == "success"
 
 
+def test_outlet_only_preserves_outlet_accounting_and_omits_history(tmp_path: Path) -> None:
+    data = _fixture(tmp_path)
+    boundary = tmp_path / "boundary.csv"
+    pd.DataFrame({"time": [data["time"]], "reach_id": [3], "Q_m3s": [10.0]}).to_csv(boundary, index=False)
+    full, lean = tmp_path / "full", tmp_path / "lean"
+    for output, mode in ((full, "full"), (lean, "outlet-only")):
+        call = _call(data, output, "--boundary-inflow", str(boundary), "--output-detail", mode)
+        assert call.returncode == 0, call.stderr
+    assert (full / "outlet_flow.csv").read_bytes() == (lean / "outlet_flow.csv").read_bytes()
+    assert (full / "model_config.json").read_bytes() == (lean / "model_config.json").read_bytes()
+    full_result = json.loads((full / "result.json").read_text(encoding="utf-8"))
+    lean_result = json.loads((lean / "result.json").read_text(encoding="utf-8"))
+    assert full_result["checks"] == lean_result["checks"]
+    assert full_result["inputs"] == lean_result["inputs"]
+    assert lean_result["parameters"]["output_detail"] == "outlet-only"
+    assert set(lean_result["artifacts"]) == {"outlet_flow", "model_config"}
+    assert not (lean / "subbasin_process.csv").exists()
+    assert not (lean / "reach_process.csv").exists()
+    assert pd.read_csv(lean / "outlet_flow.csv").is_warmup.tolist() == [True, False, False, False]
+
+    subs, reaches, topology, _ = RUNNER.load_hydrobase(data["build"], data["qc"])
+    network = RUNNER.build_network(subs, reaches, topology)
+    config = RUNNER.load_document(data["params"])
+    adjusted, dp, coeff = RUNNER.validate_config(config, network)
+    times, forcing = RUNNER.load_forcing(data["forcing"], config, network)
+    boundary_data = RUNNER.load_boundary(boundary, times, network, config["time"]["timezone"])
+    sub, reach, outlet, metrics = RUNNER.run_model(config, network, times, forcing, boundary_data,
+                                                adjusted, dp, coeff, save_internal_process=False)
+    assert sub.empty and reach.empty and len(outlet) == 4
+    assert metrics == lean_result["checks"][2]["details"]
+
+
+def test_overwrite_full_with_outlet_only_removes_stale_details(tmp_path: Path) -> None:
+    data = _fixture(tmp_path)
+    output = tmp_path / "output"
+    assert _call(data, output).returncode == 0
+    unrelated = output / "user-notes.txt"
+    unrelated.write_text("keep", encoding="utf-8")
+    assert _call(data, output, "--output-detail", "outlet-only").returncode == 1
+    assert (output / "subbasin_process.csv").exists()
+    assert _call(data, output, "--output-detail", "outlet-only", "--overwrite").returncode == 0
+    assert not (output / "subbasin_process.csv").exists()
+    assert not (output / "reach_process.csv").exists()
+    assert unrelated.read_text(encoding="utf-8") == "keep"
+
+
+def test_installed_runner_supports_outlet_only(tmp_path: Path, utf8_env: dict[str, str]) -> None:
+    target = tmp_path / "installed"
+    install = subprocess.run([sys.executable, str(ROOT / "scripts/install_skills.py"),
+                              "--repo-root", str(ROOT), "--tool-name", "Test Agent",
+                              "--default-target", str(target), "--project-subdir", ".agents/skills",
+                              "--categories", "hydrological-modeling"],
+                             capture_output=True, text=True, encoding="utf-8", env=utf8_env)
+    assert install.returncode == 0, install.stderr
+    installed = target / "hydro-hydrological-modeling-run-semi-distributed-xaj-model/scripts/run_semi_distributed_xaj.py"
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    data = _fixture(inputs)
+    output = tmp_path / "output"
+    run = subprocess.run([sys.executable, str(installed), "--topology-result", str(data["build"]),
+                          "--topology-qc-result", str(data["qc"]), "--forcing", str(data["forcing"]),
+                          "--params", str(data["params"]), "--output-dir", str(output),
+                          "--output-detail", "outlet-only"],
+                         capture_output=True, text=True, encoding="utf-8", env=utf8_env,
+                         cwd=tmp_path)
+    assert run.returncode == 0, run.stderr
+    assert (output / "outlet_flow.csv").is_file()
+    assert not (output / "subbasin_process.csv").exists()
+    assert not (output / "reach_process.csv").exists()
+
+
 @pytest.mark.parametrize("change", ["missing_forcing", "duplicate_forcing", "bad_qc", "bad_hash",
                                     "multiple_sub_outlets", "bad_dp", "bad_timestep", "nonfinite"])
 def test_rejects_invalid_inputs(tmp_path: Path, change: str) -> None:

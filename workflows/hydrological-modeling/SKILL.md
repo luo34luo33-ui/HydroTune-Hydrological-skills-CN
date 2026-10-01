@@ -23,6 +23,8 @@ metadata:
 4. 在 simulation 前确认初始状态、warm-up 和运行期间。
 5. 标准化模拟输出，同时保存参数、软件上下文、provenance、warning 和失败状态。
 
+调用 `run-semi-distributed-xaj-model` 进行常规或长时段模拟时，显式使用 `--output-detail outlet-only`，保留出口过程及运行记录；仅在需要内部状态或河段过程诊断时选择 `full`。Python 前向调用可用 `save_internal_process=False` 关闭内部历史累积。
+
 按需阅读[使用指南](usage-guide.md)，并以[机器可读工作流](workflow.yaml)定义的分支与 QC 为准。
 
 ## 停止条件

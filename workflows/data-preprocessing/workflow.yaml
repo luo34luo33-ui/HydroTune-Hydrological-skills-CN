@@ -95,5 +95,36 @@ stages:
       checks:
         - 输出满足目标模型所需的时间与空间结构
         - unavailable、warning 和待确认事项未被静默丢弃
+  - id: processing_results_report
+    type: skill
+    skill_ref: visualization-reporting/generate-timeseries-data-processing-report
+    description: 汇总时序资料与洪水规模、显著峰型及事件总体特征，不自动重跑数据处理。
+    depends_on:
+      - source_inventory
+    inputs:
+      - processing_manifest_with_available_results
+    outputs:
+      - data_processing_results_report
+      - processing_evidence_index
+      - processing_data_gaps
+    qc:
+      required: false
+      checks:
+        - 必需来源和已使用处理产物通过契约与哈希检查
+        - 单项 QC 不被表述为完整模型就绪性
+  - id: spatial_processing_results_report
+    type: skill
+    skill_ref: visualization-reporting/generate-spatial-data-processing-report
+    description: 汇总半分布式空间准备成果的流域概况、子流域、河段和拓扑。
+    depends_on:
+      - source_inventory
+    inputs:
+      - spatial_processing_manifest_with_available_results
+    outputs:
+      - spatial_processing_results_report
+    qc:
+      required: false
+      checks:
+        - 必需拓扑表可用，空间成果不表述为整体模型就绪
 feedback_targets: []
 

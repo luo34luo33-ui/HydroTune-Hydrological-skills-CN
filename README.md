@@ -2,7 +2,7 @@
 
 HydroTune-skills 是一个面向水文模拟 AI Coding Agent 的可复用 Agent Skills 仓库。它把水文专家的决策边界、数据约束、质量控制、失败模式和结果解释组织为可发现、可安装、可校验的 Atomic Skills 与 Workflows。
 
-当前版本包含三十五个 Atomic Skill：五个 `data-processing`、六个 `spatial-analysis`、十个 `hydrological-modeling`、两个 `post-processing`、三个 `evaluation-diagnostics`、五个 `model-calibration` 和四个 `visualization-reporting` Skill。率定覆盖 DE、GA、PSO、SCE-UA 和模拟退火—L-BFGS-B 两阶段算法，并由统一固定图册展示率定与验证证据。建模链提供集总式与半分布式新安江、马斯京根与 Lohmann 两种河道演算、集总式大伙房（DHF）、集总式 HBV、集总式 Tank、集总式 GR4J、集总式 SAC-SMA 与地形输入驱动的集总式 TOPMODEL 十个模型 Skill，后处理提供机器学习残差校正与出口流量对齐。三个抽象 workflow、跨平台安装器、schema 和验证体系保持有效。
+当前版本包含四十个 Atomic Skill：五个 `data-processing`、六个 `spatial-analysis`、十一个 `hydrological-modeling`、两个 `post-processing`、三个 `evaluation-diagnostics`、五个 `model-calibration` 和八个 `visualization-reporting` Skill。率定覆盖 DE、GA、PSO、SCE-UA 和模拟退火—L-BFGS-B 两阶段算法，并由统一固定图册展示率定与验证证据。建模链提供集总式与半分布式新安江、基于显式 HRU 表的半分布式 SWAT、马斯京根与 Lohmann 两种河道演算、集总式大伙房（DHF）、集总式 HBV、集总式 Tank、集总式 GR4J、集总式 SAC-SMA 与地形输入驱动的集总式 TOPMODEL 十一个模型 Skill，后处理提供机器学习残差校正与出口流量对齐。三个 workflow、跨平台安装器、schema 和验证体系保持有效。
 
 ## 设计来源
 
@@ -63,7 +63,7 @@ Atomic Skill 解决一个具体水文分析问题；Workflow 负责组合多个�
 - `hydrological-modeling`：编排集总式与半分布式建模分支。
 - `simulation-analysis`：建立观测—模式—假设—证据—报告诊断链。
 
-Workflow 当前使用抽象 stage，不绑定具体 Skill ID。模拟分析只能提出返回上游 workflow 的建议，不会自动修改数据、模型或参数。
+Workflow 的分析与建模阶段保留抽象定义，simulation-analysis 的 structured_report 阶段与 data-preprocessing 的 processing_results_report 阶段绑定对应报告生成 Skill。模拟分析只能提出返回上游 workflow 的建议，不会自动修改数据、模型或参数。
 
 ## Spatial Analysis Skills
 
@@ -82,12 +82,21 @@ prepare-dem-analysis-grid
 
 这些 Skill 已存在，但 `data-preprocessing` workflow 仍有意保持抽象 stage，以免把所有空间预处理任务固定为单一 DEM 路线。
 
+## 水文研究报告 Skills
+
+- `generate-timeseries-data-processing-report`：汇总时序资料、洪水规模与显著单峰/多峰比例；参数显式提供，无需模拟或评价。
+- `generate-spatial-data-processing-report`：汇总流域概况、子流域与河段数量、空间映射和上下游拓扑。
+- `generate-hydrological-study-report`：显式清单绑定模拟和评价，整合可选预处理、空间、率定及图册成果，使用 prepare → Agent 论述 → finalize 生成 Markdown、JSON、CSV 报告包。
+- `review-hydrological-study-report`：重新核对原始证据、数值、单位、时段、split、表图和论述支持度；未完成逐段语义审查不得整体通过。
+
+首版支持中英文，不提供 DOCX/PDF 导出或外部报告解析。
+
 ## 空间可视化图册 Skills
 
 - `visualize-dem-hydrology-atlas`：生成流域与 DEM 范围、地形、汇流累积河网、Strahler 等级与子流域图。
 - `visualize-hydrobase-atlas`：生成 HydroBase 拓扑图、形态属性三联图和 QC 看板。
 
-两者使用同一份 `hydrotune.spatial-atlas.v1` 固定样式。每个模板输出 `2400×1600 px` PNG、可编辑 SVG 和 `figure.json`；PNG 不绑定 A4 或其他物理纸张尺寸，排版与高质量印刷优先使用 SVG。可视化只消费已有 artifacts，不修改空间数据、不重算水文指标，也不隐藏上游 warning 或 QC FAIL。
+DEM 图册使用 `hydrotune.dem-hydrology-atlas.v2`：白底、无主副标题、图例与色标置于主图内、按真实流域边界裁切，中文宋体、英文 Times New Roman；PNG 最长边为 2400 px，画布跟随流域长宽比。HydroBase 图册保留 `hydrotune.spatial-atlas.v1` 和 `2400×1600 px`。两者均输出 PNG、可编辑 SVG 和 `figure.json`，图名与实际像素尺寸保留在元数据中。可视化只消费已有 artifacts，不修改空间数据、不重算水文指标；上游 warning 或 QC FAIL 保留在运行状态与机器附件中。
 
 ## 流量预处理与洪水事件 Skills
 
@@ -113,7 +122,7 @@ prepare-discharge-timeseries
 - `extract-flood-events`：消费完整版本化配置，识别、合并、筛选事件并输出汇总表、过程表、逐场文件与机器可读 QC。
 - `visualize-flood-event-atlas`：生成完整序列总览与逐场过程图，只展示上游已有边界和指标。
 
-事件示例配置用于复现参考源码，不是通用默认值。逐场图同样固定输出 `2400×1600 px` PNG、SVG 和 `figure.json`。
+事件示例配置用于复现参考源码，不是通用默认值。洪水图册 v2 输出 `2400×1200 px` PNG、SVG 和 `figure.json`，采用白底论文版式、图内三项指标摘要、黑灰过程线及红色洪峰；可显式叠加已确认流域平均雨量的倒置柱状图，中文宋体、英文 Times New Roman。
 
 ## 模型率定与效果图册 Skills
 
@@ -124,7 +133,7 @@ calibrate-model-{de|ga|pso|sce-ua|two-stage}
 
 - 五种优化器共用显式问题、参数边界、目标方向、seed、评估预算和 Python 评估器协议。
 - 搜索只使用 calibration split；最优参数锁定后才运行 validation，并输出标准指标、搜索轨迹和观测模拟序列。
-- `visualize-model-calibration` 固定生成率定总览、验证过程和验证散点图，不重算指标或改变 split。
+- `visualize-model-calibration` 使用白底无图名的论文风格生成率定总览、验证过程和散点图；支持多模型及后处理序列对比，图例显示本场 scored 样本 NSE，不替换上游汇总指标或改变 split。
 - 算法示例配置用于演示或来源行为复现，不作为通用水文默认值。
 
 ## 建模与河道演算 Skills
@@ -248,7 +257,7 @@ Claude Code 使用 `install-claude.sh`/`.ps1`，OpenCode 使用 `install-opencod
 
 全量安装默认包含 Atomic Skills 和 workflows；一旦使用 `--categories`，workflow 必须通过 `--workflows` 显式选择。更新使用渲染后内容的 SHA-256；卸载只删除安装清单记录的目录。
 
-默认安装和 dry-run 包含三十五个 Atomic Skill 与三个 workflow。使用 `--categories data-processing` 时安装五个时序、蒸散与事件 Skill；`spatial-analysis` 安装六个空间分析 Skill（含 TOPMODEL 地形输入与 forcing 面积聚合）；`hydrological-modeling` 安装十个模型 Skill（集总式与半分布式新安江、马斯京根、Lohmann、大伙房、HBV、Tank、GR4J、SAC-SMA、TOPMODEL）；`post-processing` 安装两个模拟后处理 Skill；`evaluation-diagnostics` 安装三个指标与汇总 Skill；`model-calibration` 安装五个率定 Skill；`visualization-reporting` 安装四个固定图册 Skill。尚无 Skill 的 category 仍会明确报告“当前无可安装 Atomic Skill”。
+默认安装和 dry-run 包含四十个 Atomic Skill 与三个 workflow。使用 `--categories data-processing` 时安装五个时序、蒸散与事件 Skill；`spatial-analysis` 安装六个空间分析 Skill（含 TOPMODEL 地形输入与 forcing 面积聚合）；`hydrological-modeling` 安装十一个模型 Skill（集总式与半分布式新安江、半分布式 SWAT、马斯京根、Lohmann、大伙房、HBV、Tank、GR4J、SAC-SMA、TOPMODEL）；`post-processing` 安装两个模拟后处理 Skill；`evaluation-diagnostics` 安装三个指标与汇总 Skill；`model-calibration` 安装五个率定 Skill；`visualization-reporting` 安装四个固定图册、三个报告生成 Skill 和一个独立审查 Skill。尚无 Skill 的 category 仍会明确报告“当前无可安装 Atomic Skill”。
 
 ## 校验与测试
 
@@ -260,17 +269,19 @@ python -m pytest
 python -m pytest -m integration
 ```
 
-当前仓库基线为“35 个 Atomic Skill + 3 个抽象 Workflow”。校验器会拒绝无效 frontmatter、错误目录层级、未注册 category、失效引用、无效数据契约、重复或循环 stage 以及未完成占位内容。
+当前仓库基线为“40 个 Atomic Skill + 3 个 Workflow”。校验器会拒绝无效 frontmatter、错误目录层级、未注册 category、失效引用、无效数据契约、重复或循环 stage 以及未完成占位内容。
 
 ## 当前边界
 
 - 当前空间算法范围覆盖无河网蚀刻的 DEM→HydroBase 链及经验证的单出口 TOPMODEL 地形输入；不包含河网 burning、出口点吸附或多流向算法。
 - 空间图册采用固定离线模板，不提供在线底图、3D 地形、任意画布尺寸或运行时主题修改。
 - 洪水事件路线只实现 Eckhardt 基流分割和配置驱动的流量事件提取；不包含降雨事件识别、人工边界编辑或其他基流分割算法。
-- 建模链覆盖现有集总式模型、基于 HydroBase 的半分布式新安江，以及马斯京根、Lohmann 河道演算；不包含完全分布式新安江或自动参数率定。
+- 建模链覆盖现有集总式模型、基于 HydroBase 的半分布式新安江与半分布式 SWAT（日尺度，含显式 HRU 表与四级水量平衡审计），以及马斯京根、Lohmann 河道演算；半分布式 SWAT 未实现融雪、冻土、灌溉、农业管理、水库调度等过程，且未与 SWAT+ 做数值对照；不包含完全分布式模型或自动参数率定。
 - 残差校正 Skill 只做数值校正，不提供模型可解释性（SHAP 一类）与特征重要性结论。
 - 指标 Skill 只产出证据并支持跨场次汇总；不包含成因诊断、误差模式自动归因与频率分析。
 - 不覆盖完全分布式、水动力或地下水建模 workflow。
 - 尚未打包为 Codex/ChatGPT 插件；插件分发属于后续阶段。
 
 从外部源码建设新 Skill 时，请先阅读 `source_to_skills_development_guide.md`，再结合 `skill_writing_reference.md` 和 `CONTRIBUTING.md` 完成实现与验收。
+
+报告 skill 重命名后，安装器 --update 会将受管的旧 generate-data-processing-report 安装项保存为目标目录下 .hydrotune-retired-skills/ 的 ZIP，再移除旧目录，避免重复发现；本地修改保留在归档中。非受管目录不会自动移除。

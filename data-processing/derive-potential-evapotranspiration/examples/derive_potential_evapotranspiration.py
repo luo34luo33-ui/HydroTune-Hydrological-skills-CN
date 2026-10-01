@@ -75,7 +75,7 @@ def compute(source: pd.DataFrame, stations: pd.DataFrame, config: dict) -> tuple
     axes = []
     for _, group in work.groupby("source_id"):
         axis = pd.DatetimeIndex(group.time)
-        if len(axis) < 2 or not (np.diff(axis.asi8) == config["timestep_seconds"] * 10**9).all():
+        if len(axis) < 2 or not (np.diff(axis) == pd.Timedelta(seconds=config["timestep_seconds"])).all():
             raise QCError("missing or irregular meteorology step")
         axes.append(tuple(axis.tz_convert("UTC")))
     if any(axis != axes[0] for axis in axes[1:]):

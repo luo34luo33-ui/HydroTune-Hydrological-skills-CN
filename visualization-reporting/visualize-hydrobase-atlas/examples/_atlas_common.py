@@ -141,6 +141,8 @@ def prepare_output_dir(output_dir: Path, overwrite: bool, template_ids: list[str
         names = ["result.json"]
         for template_id in template_ids:
             names.extend(f"{template_id}.{suffix}" for suffix in ("png", "svg", "figure.json"))
+        for title in ("HydroBase 水文拓扑", "HydroBase hydrological topology"):
+            names.extend(f"{title}.{suffix}" for suffix in ("png", "svg", "figure.json"))
         for name in names:
             target = output_dir / name
             if target.is_file():
@@ -264,19 +266,20 @@ def save_figure(
     warnings: list[str],
     publication_ready: bool,
 ) -> dict[str, dict[str, str]]:
-    png_path = output_dir / f"{template_id}.png"
-    svg_path = output_dir / f"{template_id}.svg"
+    filename = getattr(figure, "hydrotune_filename", template_id)
+    png_path = output_dir / f"{filename}.png"
+    svg_path = output_dir / f"{filename}.svg"
     metadata = {"Software": "HydroTune spatial atlas v1"}
     figure.savefig(png_path, dpi=200, facecolor=figure.get_facecolor(), metadata=metadata)
     figure.savefig(svg_path, facecolor=figure.get_facecolor(), metadata={"Date": None})
     plt.close(figure)
     figure_document = {
         "schema_version": "1.0",
-        "template_version": TEMPLATE_VERSION,
+        "template_version": getattr(figure, "hydrotune_template_version", TEMPLATE_VERSION),
         "template_id": template_id,
         "language": language,
         "title": title,
-        "pixel_size": {"width": 2400, "height": 1600},
+        "pixel_size": {"width": figure.canvas.get_width_height()[0], "height": figure.canvas.get_width_height()[1]},
         "source_results": source_results,
         "layers": layers,
         "crs": crs,
@@ -288,7 +291,7 @@ def save_figure(
         "warnings": list(warnings),
         "publication_ready": bool(publication_ready),
     }
-    json_path = output_dir / f"{template_id}.figure.json"
+    json_path = output_dir / f"{filename}.figure.json"
     json_path.write_text(json.dumps(figure_document, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {
         f"{template_id}_png": file_reference(png_path, output_dir),

@@ -5,29 +5,73 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "template_version", "template_id", "language", "title",
-    "pixel_size", "source_results", "layers", "crs", "extent", "outputs",
-    "warnings", "publication_ready"
+    "schema_version",
+    "template_version",
+    "template_id",
+    "language",
+    "title",
+    "pixel_size",
+    "source_results",
+    "layers",
+    "crs",
+    "extent",
+    "outputs",
+    "warnings",
+    "publication_ready"
   ],
   "properties": {
-    "schema_version": { "const": "1.0" },
-    "template_version": { "const": "hydrotune.spatial-atlas.v1" },
-    "template_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-    "language": { "enum": ["zh", "en"] },
-    "title": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "template_version": {
+      "enum": [
+        "hydrotune.spatial-atlas.v1",
+        "hydrotune.dem-hydrology-atlas.v2",
+        "hydrotune.hydrobase-morphometry.v2",
+        "hydrotune.hydrobase-topology.v2",
+        "hydrotune.hydrobase-qc-dashboard.v2"
+      ]
+    },
+    "template_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "language": {
+      "enum": [
+        "zh",
+        "en"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
     "pixel_size": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height"],
+      "required": [
+        "width",
+        "height"
+      ],
       "properties": {
-        "width": { "const": 2400 },
-        "height": { "const": 1600 }
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2400
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2400
+        }
       }
     },
     "source_results": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": { "$ref": "#/$defs/fileReference" }
+      "additionalProperties": {
+        "$ref": "#/$defs/fileReference"
+      }
     },
     "layers": {
       "type": "array",
@@ -35,44 +79,123 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "source", "display_transform", "palette"],
+        "required": [
+          "id",
+          "source",
+          "display_transform",
+          "palette"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "source": { "type": "string", "minLength": 1 },
-          "display_transform": { "type": "string", "minLength": 1 },
-          "palette": { "type": "string", "minLength": 1 }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "display_transform": {
+            "type": "string",
+            "minLength": 1
+          },
+          "palette": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
-    "crs": { "type": "string", "minLength": 1 },
+    "crs": {
+      "type": "string",
+      "minLength": 1
+    },
     "extent": {
       "type": "array",
       "prefixItems": [
-        { "type": "number" }, { "type": "number" },
-        { "type": "number" }, { "type": "number" }
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
       ],
       "items": false
     },
     "outputs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["png", "svg"],
+      "required": [
+        "png",
+        "svg"
+      ],
       "properties": {
-        "png": { "$ref": "#/$defs/fileReference" },
-        "svg": { "$ref": "#/$defs/fileReference" }
+        "png": {
+          "$ref": "#/$defs/fileReference"
+        },
+        "svg": {
+          "$ref": "#/$defs/fileReference"
+        }
       }
     },
-    "warnings": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "publication_ready": { "type": "boolean" }
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "publication_ready": {
+      "type": "boolean"
+    }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "template_version": {
+            "const": "hydrotune.spatial-atlas.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "pixel_size": {
+            "properties": {
+              "width": {
+                "const": 2400
+              },
+              "height": {
+                "const": 1600
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "fileReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": [
+        "path",
+        "sha256"
+      ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
       }
     }
   }

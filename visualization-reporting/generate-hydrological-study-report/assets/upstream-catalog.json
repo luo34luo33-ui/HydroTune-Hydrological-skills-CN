@@ -1,0 +1,1326 @@
+{
+  "data-processing/derive-potential-evapotranspiration": {
+    "stage": "preprocessing",
+    "variables": {}
+  },
+  "data-processing/extract-flood-events": {
+    "stage": "preprocessing",
+    "variables": {}
+  },
+  "data-processing/prepare-discharge-timeseries": {
+    "stage": "preprocessing",
+    "variables": {
+      "source_discharge": {
+        "name": "source_discharge",
+        "semantics": "用户明确指定的连续流量观测列。",
+        "units": "m3/s, L/s or cfs as confirmed",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测不得静默外推；修复行为必须显式选择并标记。"
+      }
+    }
+  },
+  "data-processing/prepare-model-forcing-timeseries": {
+    "stage": "preprocessing",
+    "variables": {}
+  },
+  "data-processing/separate-baseflow-eckhardt": {
+    "stage": "preprocessing",
+    "variables": {
+      "baseflow_m3_s": {
+        "name": "baseflow_m3_s",
+        "semantics": "Eckhardt 数字滤波得到的基流分量。",
+        "units": "m3/s",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "不允许缺测。"
+      },
+      "quickflow_m3_s": {
+        "name": "quickflow_m3_s",
+        "semantics": "discharge_m3_s 减去 baseflow_m3_s。",
+        "units": "m3/s",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "不允许缺测。"
+      }
+    }
+  },
+  "spatial-analysis/aggregate-forcing-to-model-units": {
+    "stage": "spatial",
+    "variables": {}
+  },
+  "spatial-analysis/build-hydrological-topology": {
+    "stage": "spatial",
+    "variables": {
+      "area_km2": {
+        "name": "area_km2",
+        "semantics": "真实流域掩膜内子流域有效像元数乘像元面积。",
+        "units": "km2",
+        "spatial_unit": "subbasin",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失。"
+      },
+      "length_m": {
+        "name": "length_m",
+        "semantics": "D8 像元中心连线与真实流域多边形相交部分的累计长度。",
+        "units": "m",
+        "spatial_unit": "reach",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失或零长度。"
+      },
+      "downstream_reach_id": {
+        "name": "downstream_reach_id",
+        "semantics": "筛选后直接下游河段；0 表示离开真实流域。",
+        "units": "identifier",
+        "spatial_unit": "reach",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "0 是明确出口，不是缺失值。"
+      }
+    }
+  },
+  "spatial-analysis/derive-topmodel-terrain-inputs": {
+    "stage": "spatial",
+    "variables": {}
+  },
+  "spatial-analysis/extract-dem-stream-network": {
+    "stage": "spatial",
+    "variables": {
+      "elevation": {
+        "name": "elevation",
+        "semantics": "用于填洼和 D8 流向计算的地表高程。",
+        "units": "m",
+        "coordinate_reference_system": "必须为米制投影 CRS",
+        "spatial_unit": "raster cell",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "NoData 不参与水文运算。"
+      }
+    }
+  },
+  "spatial-analysis/prepare-dem-analysis-grid": {
+    "stage": "spatial",
+    "variables": {
+      "elevation": {
+        "name": "elevation",
+        "semantics": "地表高程；输入单位由 vertical-unit 明确声明。",
+        "units": "m or ft as confirmed",
+        "coordinate_reference_system": "必须由源文件明确给出",
+        "spatial_unit": "raster cell",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "使用源 NoData；没有 NoData 时仅有限数值视为有效高程。"
+      }
+    }
+  },
+  "spatial-analysis/validate-hydrological-topology": {
+    "stage": "spatial",
+    "variables": {
+      "status": {
+        "name": "status",
+        "semantics": "单项拓扑质量检查状态。",
+        "units": "PASS, WARN or FAIL",
+        "spatial_unit": "check",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失。"
+      }
+    }
+  },
+  "hydrological-modeling/route-lohmann-channel": {
+    "stage": "simulation",
+    "variables": {
+      "direct": {
+        "name": "direct",
+        "semantics": "直接径流入流（如地表流与壤中流），与合成直径流单位线卷积；单位与出流一致，由调用方确认。",
+        "units": "与出流单位一致（mm per step 或 m3/s 等，原样通过）",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN（UH 为日尺度）",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "base": {
+        "name": "base",
+        "semantics": "基流入流（如下区自由水出流），与脉冲型基流合成单位线卷积；单位与出流一致。",
+        "units": "与出流单位一致（原样通过）",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "N": {
+        "name": "N",
+        "semantics": "Gamma HRU 直径流单位线的形状参数。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止；源码行为即越界取值。"
+      },
+      "K": {
+        "name": "K",
+        "semantics": "Gamma HRU 直径流单位线的尺度参数（水库常数）。",
+        "units": "days",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止。"
+      },
+      "VELO": {
+        "name": "VELO",
+        "semantics": "线性化 Saint-Venant 方程的波速。",
+        "units": "m/s",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止。"
+      },
+      "DIFF": {
+        "name": "DIFF",
+        "semantics": "线性化 Saint-Venant 方程的扩散系数。",
+        "units": "m2/s",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止。"
+      },
+      "routed_direct": {
+        "name": "routed_direct",
+        "semantics": "直接入流经合成直径流单位线卷积后的出流；零初始历史，单位与入流一致。",
+        "units": "与入流单位一致（原样通过）",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "routed_base": {
+        "name": "routed_base",
+        "semantics": "基流入流经脉冲型合成基流单位线（即河道日 UH）卷积后的出流。",
+        "units": "与入流单位一致（原样通过）",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "Q_total": {
+        "name": "Q_total",
+        "semantics": "流域出口总出流，routed_direct + routed_base。",
+        "units": "与入流单位一致（原样通过）",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/route-muskingum-channel": {
+    "stage": "simulation",
+    "variables": {
+      "inflow": {
+        "name": "inflow",
+        "semantics": "待演进的入流序列，列名由 --route-spec 显式声明；单位必须已由上游确认。",
+        "units": "m3/s",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止，不得静默填 0 或插值。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "K": {
+        "name": "K",
+        "semantics": "马斯京根槽蓄时间常数，单河段布局下使用；串联布局的等效 K 等于时间步长。",
+        "units": "h",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "X": {
+        "name": "X",
+        "semantics": "马斯京根权重因子，串联布局下参与 x_l = 0.5 - n(1-2X)/2 的计算。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "routed_outflow": {
+        "name": "routed_outflow",
+        "semantics": "演进后的出流序列，负值已按源码行为裁剪到 0。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-dhf-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨，每步长水深；由调用方确认为面平均值。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "PET": {
+        "name": "PET",
+        "semantics": "蒸发能力，每步长水深，乘以蒸系数 KC 后与降雨同量纲相减。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；来源与处理方法由调用方记录。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "S0": {
+        "name": "S0",
+        "semantics": "表层蓄水容量。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "U0": {
+        "name": "U0",
+        "semantics": "下层蓄水容量。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "G": {
+        "name": "G",
+        "semantics": "不透水面积比例，取值落在 0 到 1 之间。",
+        "units": "fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "Q": {
+        "name": "Q",
+        "semantics": "流域出口流量，地表与地下单位线卷积之和，负值已按源码行为截断为 0。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "RUNOFF": {
+        "name": "RUNOFF",
+        "semantics": "产流总量，等于 Y 与 Y0 之和截负，是汇流卷积的输入。",
+        "units": "mm per time step",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "SA": {
+        "name": "SA",
+        "semantics": "表层蓄水状态，必须落在 0 与 S0 之间。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "YA": {
+        "name": "YA",
+        "semantics": "前期影响雨量，非负递推量，驱动单位线时程参数 TM。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-gr4j-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨，每步长水深；由调用方确认为面平均值。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "PET": {
+        "name": "PET",
+        "semantics": "蒸发能力，每步长水深，与降雨同量纲相减进入 tanh 产流分支。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；来源与处理方法由调用方记录。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "X1": {
+        "name": "X1",
+        "semantics": "产流水库容量，tanh 产流分支与 percolation 的尺度参数。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止；源码行为即 KeyError。"
+      },
+      "X2": {
+        "name": "X2",
+        "semantics": "地下水交换系数，可为负；负值表示外部汇入（GR4J 标准语义）。",
+        "units": "mm",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止；源码行为即 KeyError。"
+      },
+      "X4": {
+        "name": "X4",
+        "semantics": "单位线历时，以步为单位；决定 UH1/UH2 长度（ceil(X4) 与 ceil(2·X4)）。",
+        "units": "steps",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止。"
+      },
+      "Q_MM": {
+        "name": "Q_MM",
+        "semantics": "源码等价的出口流量（mm per step），与 gr4j() 返回值逐位一致，用作等价锚点。",
+        "units": "mm per time step",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "Q": {
+        "name": "Q",
+        "semantics": "流域出口流量，Q_MM 乘以面积与步长换算系数。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "PROD_STORE": {
+        "name": "PROD_STORE",
+        "semantics": "产流水库蓄水状态，tanh 公式自限、非负。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "ROUT_STORE": {
+        "name": "ROUT_STORE",
+        "semantics": "汇流水库蓄水状态，经 floor 0 与非线性出流更新，非负。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-hbv-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨，每步长水深；由调用方确认为面平均值。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "evap": {
+        "name": "evap",
+        "semantics": "蒸发能力，每步长水深，乘以系数 c 后得到蒸散发需求。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；来源与处理方法由调用方记录。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "fc": {
+        "name": "fc",
+        "semantics": "土壤持水容量，与 lp 共同决定凋萎点 PWP = lp × fc。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "c": {
+        "name": "c",
+        "semantics": "蒸发能力缩放系数，取值落在 0 到 1 之间。",
+        "units": "fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "Q": {
+        "name": "Q",
+        "semantics": "流域出口流量，三个线性水库出流之和按面积换算，负值已截断为 0。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "SM": {
+        "name": "SM",
+        "semantics": "土壤含水量状态，非负。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "RECHARGE": {
+        "name": "RECHARGE",
+        "semantics": "进入响应层的补给量，由有效雨乘以蓄满修正项得到，含源码固有的消减损耗。",
+        "units": "mm per time step",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-sacsma-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨，每步长水深；由调用方确认为面平均值。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN（源码为日水量核算）",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "PET": {
+        "name": "PET",
+        "semantics": "蒸发能力，每步长水深，驱动 ET1–ET5 分层扣蒸；来源与处理方法由调用方记录。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致；非 24 小时记 WARN",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "UZTWM_UZFWM_LZTWM_LZFPM_LZFSM": {
+        "name": "UZTWM_UZFWM_LZTWM_LZFPM_LZFSM",
+        "semantics": "上张力水、上自由水、下张力水、下主自由水、下补自由水五个水库容量。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或非正必须停止；源码行为即越界取值。"
+      },
+      "UZK_LZPK_LZSK": {
+        "name": "UZK_LZPK_LZSK",
+        "semantics": "上自由水与下区主、补自由水的日消耗率；非日步长时不自动换算。",
+        "units": "1/day",
+        "time_step": "与源码日核算语义绑定",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或越界 (0,1] 必须停止。"
+      },
+      "ADIMP_PCTIM_RIVA_PFREE_RSERV": {
+        "name": "ADIMP_PCTIM_RIVA_PFREE_RSERV",
+        "semantics": "附加不透水、永久不透水、河岸植被、下渗进自由水、不可转移比例，均 ∈ [0,1]；ADIMP+PCTIM 必须小于 1。",
+        "units": "decimal fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或越界必须停止。"
+      },
+      "ZPERC_REXP_SIDE": {
+        "name": "ZPERC_REXP_SIDE",
+        "semantics": "下渗需求尺度、下渗需求形状、深层补给比；REXP 与 SIDE 必须非负。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失或为负必须停止。"
+      },
+      "Q_MM": {
+        "name": "Q_MM",
+        "semantics": "源码等价的流域出口总出流（mm per step），tot_outflow = surf + base − et4，与源码逐位一致，用作等价锚点；可能与 SURF+BASE 之和不等的源码语义原样保留。",
+        "units": "mm per time step",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "Q": {
+        "name": "Q",
+        "semantics": "流域出口总出流，Q_MM 乘以面积与步长换算系数。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "SURF_BASE": {
+        "name": "SURF_BASE",
+        "semantics": "调整后的地表流（ROIMP+SSUR+SIF+SDRO 经 et4 调整）与基流（主、补自由水河道分量）；分量列 ROIMP/SSUR/SIF/SDRO 同步输出。",
+        "units": "mm per time step",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "UZTWC_UZFWC_LZTWC_LZFSC_LZFPC_ADIMC": {
+        "name": "UZTWC_UZFWC_LZTWC_LZFSC_LZFPC_ADIMC",
+        "semantics": "六个水库蓄水状态；要求非负，LZTWC 因库间溢出回补可能瞬时超过 LZTWM（源码行为）。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-tank-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨，每步长水深；由调用方确认为面平均值。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "evap": {
+        "name": "evap",
+        "semantics": "蒸发能力，每步长水深，直接从降雨扣除得到净雨，不从土壤调蓄。",
+        "units": "mm per time step",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；来源与处理方法由调用方记录。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "t0_soh_uo": {
+        "name": "t0_soh_uo",
+        "semantics": "顶箱上侧孔高度，必须不小于下侧孔高度 t0_soh_lo。",
+        "units": "mm",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "t3_soc": {
+        "name": "t3_soc",
+        "semantics": "末箱侧孔出流系数，取值落在 0 到 1 之间。",
+        "units": "fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "Q": {
+        "name": "Q",
+        "semantics": "流域出口流量，全部侧孔出流之和按面积换算，负值已截断为 0。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "S0": {
+        "name": "S0",
+        "semantics": "顶箱蓄水状态，非负；顶箱入流为净雨 P - evap。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      },
+      "S3": {
+        "name": "S3",
+        "semantics": "末箱蓄水状态，非负，仅经单一侧孔出流，退水最慢。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "QC 失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-lumped-topmodel": {
+    "stage": "simulation",
+    "variables": {}
+  },
+  "hydrological-modeling/run-lumped-xaj-model": {
+    "stage": "simulation",
+    "variables": {
+      "P": {
+        "name": "P",
+        "semantics": "面平均降雨强度，由调用方确认为面平均值而非单站值。",
+        "units": "mm/h",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得静默填 0 或插值后继续。"
+      },
+      "E0": {
+        "name": "E0",
+        "semantics": "蒸发能力，由调用方提供；本 Skill 不内置月份蒸发查表。",
+        "units": "mm/h",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；来源与处理方法由调用方记录。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "严格递增且等间隔的时间索引。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "WM": {
+        "name": "WM",
+        "semantics": "流域平均蓄水容量，WM 必须不小于 WUM 与 WLM 之和。",
+        "units": "mm",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "not_applicable",
+        "catchment_area": "由 --area-km2 显式提供，单位 km2",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "IM": {
+        "name": "IM",
+        "semantics": "不透水面积比例，取值落在 0 到 1 之间。",
+        "units": "fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "缺失必须停止，不得使用经验默认值。"
+      },
+      "Qt": {
+        "name": "Qt",
+        "semantics": "坡面与河网调蓄后的河网入口流量，尚未经过串联河道演算。",
+        "units": "m3/s",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "计算失败时不产出；不写 NaN。"
+      },
+      "W": {
+        "name": "W",
+        "semantics": "三层土壤含水量之和，必须不超过 WM。",
+        "units": "mm",
+        "time_step": "与输入时间步长一致",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "计算失败时不产出；不写 NaN。"
+      }
+    }
+  },
+  "hydrological-modeling/run-semi-distributed-swat-model": {
+    "stage": "simulation",
+    "variables": {
+      "hru_id": {
+        "name": "hru_id",
+        "semantics": "HRU 标识符，必须唯一；仅用于结果与溯源标签。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失或重复。"
+      },
+      "sub_id": {
+        "name": "sub_id",
+        "semantics": "所属 HydroBase 子流域正整数标识，用于把 HRU 面积汇到一处局地产流。",
+        "units": "dimensionless",
+        "spatial_unit": "subbasin",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须存在于 subbasins.csv。"
+      },
+      "area_km2": {
+        "name": "area_km2",
+        "semantics": "HRU 面积，同一子流域内之和必须等于 subbasins.csv 的 area_km2。",
+        "units": "km2",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "不允许缺失、零或负值。"
+      },
+      "cn2": {
+        "name": "cn2",
+        "semantics": "常态土壤水分条件下的 SCS 曲线数 II。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "time_step": "static",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须显式给出。"
+      },
+      "soil_%i_thickness_mm": {
+        "name": "soil_%i_thickness_mm",
+        "semantics": "第 i 层土层厚度（mm），土层储量字段均为扣除凋萎点后的水量。",
+        "units": "mm",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "每层五个字段必须齐备；土层索引自 1 连续编号。"
+      },
+      "soil_%i_fc_mm": {
+        "name": "soil_%i_fc_mm",
+        "semantics": "第 i 层田间持水量（mm H2O）。",
+        "units": "mm",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "同 soil_%i_thickness_mm。"
+      },
+      "soil_%i_ul_mm": {
+        "name": "soil_%i_ul_mm",
+        "semantics": "第 i 层饱和储水量（mm H2O），必须不小于 fc。",
+        "units": "mm",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "同 soil_%i_thickness_mm。"
+      },
+      "soil_%i_wp_mm_per_mm": {
+        "name": "soil_%i_wp_mm_per_mm",
+        "semantics": "第 i 层凋萎点含水量（mm H2O / mm 土层），V1 仅参与记录。",
+        "units": "mm/mm",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "同 soil_%i_thickness_mm。"
+      },
+      "soil_%i_ksat_mm_hr": {
+        "name": "soil_%i_ksat_mm_hr",
+        "semantics": "第 i 层饱和导水率，用于渗漏与侧向流。",
+        "units": "mm/hr",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "同 soil_%i_thickness_mm；必须为正。"
+      },
+      "aquifer_alpha": {
+        "name": "aquifer_alpha",
+        "semantics": "含水层基流退水系数（`alpha_bf`）。",
+        "units": "1/day",
+        "spatial_unit": "hru",
+        "time_step": "daily",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "aquifer_seep_frac": {
+        "name": "aquifer_seep_frac",
+        "semantics": "含水层补给中漏失到深层的比例（`gw_seep_frac`）。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失，取值范围 [0,1]；默认 0 表示无深部漏失。"
+      },
+      "aquifer_specific_yield": {
+        "name": "aquifer_specific_yield",
+        "semantics": "给水度，用于把含水层储量换算为地下水位埋深。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "aquifer_dep_bot_m": {
+        "name": "aquifer_dep_bot_m",
+        "semantics": "含水层底板埋深（m）。",
+        "units": "m",
+        "spatial_unit": "hru",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "aquifer_flo_min_m": {
+        "name": "aquifer_flo_min_m",
+        "semantics": "基流触发的最大允许水位埋深（m），水位更深时停止出流。",
+        "units": "m",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值非负。"
+      },
+      "aquifer_revap_co": {
+        "name": "aquifer_revap_co",
+        "semantics": "地下水再蒸发系数（V1 实现：水位浅于 revap_min_m 时按 PET 比例抽取）。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；默认 0 表示无再蒸发。"
+      },
+      "aquifer_revap_min_m": {
+        "name": "aquifer_revap_min_m",
+        "semantics": "再蒸发允许的含水层最大水位埋深（m）。",
+        "units": "m",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值非负。"
+      },
+      "canmx_mm": {
+        "name": "canmx_mm",
+        "semantics": "日最大冠层截留容量（mm）；adapted，无叶面积动态。",
+        "units": "mm",
+        "spatial_unit": "hru",
+        "time_step": "daily",
+        "state_or_flux": "state",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "不允许缺失；取值非负。"
+      },
+      "brt": {
+        "name": "brt",
+        "semantics": "坡面滞后储库的日出流比例。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "time_step": "daily",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]。"
+      },
+      "latq_co": {
+        "name": "latq_co",
+        "semantics": "侧向流系数，与导水率、坡度、坡长共同决定侧向流出流。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "time_step": "daily",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]。"
+      },
+      "lat_ttime_days": {
+        "name": "lat_ttime_days",
+        "semantics": "侧向流传播时间（day），换算为指数出流系数。",
+        "units": "day",
+        "spatial_unit": "hru",
+        "time_step": "daily",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "slope_m_m": {
+        "name": "slope_m_m",
+        "semantics": "HRU 平均坡度（m/m），仅用于侧向流计算。",
+        "units": "m/m",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "lat_len_m": {
+        "name": "lat_len_m",
+        "semantics": "侧向流坡长（m）。",
+        "units": "m",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；必须为正。"
+      },
+      "perco_lim": {
+        "name": "perco_lim",
+        "semantics": "最底层渗漏折减系数。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]。"
+      },
+      "cn3_swf": {
+        "name": "cn3_swf",
+        "semantics": "SCS 形状系数调整量，把 CN-I 含水率拉向 CN-III。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]。"
+      },
+      "esco": {
+        "name": "esco",
+        "semantics": "土壤蒸发补偿因子。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]。"
+      },
+      "ep_frac": {
+        "name": "ep_frac",
+        "semantics": "再蒸发后剩余 PET 分配给植物蒸腾的比例；率定键为 `simplified_ep_frac`。",
+        "units": "dimensionless",
+        "spatial_unit": "hru",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失；取值范围 [0,1]；该分量是 replaced 实现，不是 SWAT+ 原始 LAI 分配。"
+      },
+      "P_mm": {
+        "name": "P_mm",
+        "semantics": "HRU 所在子流域的日降雨深度。",
+        "units": "mm/step",
+        "spatial_unit": "hru",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "科学 QC 失败时不生成有效序列。"
+      },
+      "E0_mm": {
+        "name": "E0_mm",
+        "semantics": "对应子流域和时间间隔的累计蒸发能力深度。",
+        "units": "mm/step",
+        "spatial_unit": "subbasin",
+        "time_step": "config.time.step_seconds 显式指定",
+        "timezone": "config.time.timezone 显式指定",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "不允许缺失、重复或隐式填零。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "带 UTC 偏移的区间末端时间戳。",
+        "units": "datetime",
+        "time_step": "config.time.step_seconds 显式指定",
+        "timezone": "config.time.timezone 显式指定",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失或重复。"
+      },
+      "Q_m3s": {
+        "name": "Q_m3s",
+        "semantics": "拓扑驱动后的唯一出口总流量（当日出流体积 / 86400 s）。",
+        "units": "m3/s",
+        "spatial_unit": "outlet_reach",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "科学 QC 失败时不生成有效模拟序列。"
+      },
+      "AET_mm": {
+        "name": "AET_mm",
+        "semantics": "实际蒸散发（冠层蒸发 + 土壤蒸发 + 植物蒸腾）。",
+        "units": "mm/step",
+        "spatial_unit": "hru",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "科学 QC 失败时不生成有效序列。"
+      },
+      "baseflow_mm": {
+        "name": "baseflow_mm",
+        "semantics": "含水层基流出流深度。",
+        "units": "mm/step",
+        "spatial_unit": "hru",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "科学 QC 失败时不生成有效序列。"
+      },
+      "residual_mm": {
+        "name": "residual_mm",
+        "semantics": "HRU 控制体逐步水盆残差（初始储量+降雨-出流-终储量）。",
+        "units": "mm",
+        "spatial_unit": "hru",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "超容差时整个运行判为失败。"
+      }
+    }
+  },
+  "hydrological-modeling/run-semi-distributed-xaj-model": {
+    "stage": "simulation",
+    "variables": {
+      "P_mm": {
+        "name": "P_mm",
+        "semantics": "对应子流域和时间间隔的累计降雨深度。",
+        "units": "mm/step",
+        "spatial_unit": "subbasin",
+        "time_step": "config.time.step_seconds 显式指定",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "不允许缺失、重复或隐式填零。"
+      },
+      "E0_mm": {
+        "name": "E0_mm",
+        "semantics": "对应子流域和时间间隔的累计蒸发能力深度。",
+        "units": "mm/step",
+        "spatial_unit": "subbasin",
+        "time_step": "config.time.step_seconds 显式指定",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "不允许缺失、重复或隐式填零。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "带 UTC 偏移的区间末端时间戳。",
+        "units": "datetime",
+        "time_step": "config.time.step_seconds 显式指定",
+        "timezone": "config.time.timezone 显式指定",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不允许缺失或重复。"
+      },
+      "Q_m3s": {
+        "name": "Q_m3s",
+        "semantics": "拓扑驱动后的唯一出口总流量。",
+        "units": "m3/s",
+        "spatial_unit": "outlet_reach",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "科学 QC 失败时不生成有效模拟序列。"
+      }
+    }
+  },
+  "model-calibration/calibrate-model-de": {
+    "stage": "calibration",
+    "variables": {}
+  },
+  "model-calibration/calibrate-model-ga": {
+    "stage": "calibration",
+    "variables": {}
+  },
+  "model-calibration/calibrate-model-pso": {
+    "stage": "calibration",
+    "variables": {}
+  },
+  "model-calibration/calibrate-model-sce-ua": {
+    "stage": "calibration",
+    "variables": {}
+  },
+  "model-calibration/calibrate-model-two-stage": {
+    "stage": "calibration",
+    "variables": {}
+  },
+  "evaluation-diagnostics/aggregate-event-metrics": {
+    "stage": "evaluation",
+    "variables": {
+      "value_column": {
+        "name": "value_column",
+        "semantics": "待聚合的数值指标列，由 --value-columns 显式列出。",
+        "units": "沿用上游指标单位",
+        "time_step": "not applicable",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "非数值单元不计入统计，但必须计数并记录。"
+      },
+      "pass_column": {
+        "name": "pass_column",
+        "semantics": "合格判定列，取值为「是」时计入合格，由 --pass-columns 显式列出。",
+        "units": "categorical",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "非「是」的值不计入合格，不静默替换。"
+      },
+      "mean": {
+        "name": "mean",
+        "semantics": "等权算术平均，不提供加权口径。",
+        "units": "沿用上游指标单位",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "全部不可用或分组为空时记为 unavailable。"
+      },
+      "qualified_rate": {
+        "name": "qualified_rate",
+        "semantics": "合格率，等于判定为「是」的场次数除以该分组场次总数。",
+        "units": "fraction",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "未给出阈值时记为 unavailable。"
+      }
+    }
+  },
+  "evaluation-diagnostics/compute-continuous-series-metrics": {
+    "stage": "evaluation",
+    "variables": {
+      "observed": {
+        "name": "observed",
+        "semantics": "连续观测流量序列，列名由 --observed-column 给出。",
+        "units": "m3/s as confirmed",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得填 0 后计算指标。"
+      },
+      "simulated": {
+        "name": "simulated",
+        "semantics": "连续模拟流量序列，列名由 --simulated-column 给出，单位必须与观测一致。",
+        "units": "m3/s as confirmed",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得填 0 后计算指标。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "连续时间索引，严格递增且等间隔。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "nse": {
+        "name": "nse",
+        "semantics": "标准纳什效率系数；观测方差为 0 时记为 unavailable。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不适用时记为 unavailable，不写 NaN。"
+      },
+      "volume_bias": {
+        "name": "volume_bias",
+        "semantics": "水量偏差，定义为 sum(模拟 - 观测) 乘以显式时间步长，单位 m3。",
+        "units": "m3",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "accumulated",
+        "missing_value_semantics": "不适用时记为 unavailable，不写 NaN。"
+      },
+      "relative_volume_bias": {
+        "name": "relative_volume_bias",
+        "semantics": "水量偏差除以观测总水量；观测总水量为 0 时记为 unavailable。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不适用时记为 unavailable，不写 NaN。"
+      }
+    }
+  },
+  "evaluation-diagnostics/compute-event-flood-metrics": {
+    "stage": "evaluation",
+    "variables": {
+      "observed": {
+        "name": "observed",
+        "semantics": "场次观测流量序列，列名由 --observed-column 给出。",
+        "units": "m3/s as confirmed",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得填 0 后计算指标。"
+      },
+      "simulated": {
+        "name": "simulated",
+        "semantics": "场次模拟流量序列，列名由 --simulated-column 给出，单位必须与观测一致。",
+        "units": "m3/s as confirmed",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "flux",
+        "accumulated_or_instantaneous": "instantaneous",
+        "missing_value_semantics": "缺测必须停止；不得填 0 后计算指标。"
+      },
+      "time": {
+        "name": "time",
+        "semantics": "场次时间索引，用于峰现时间误差。",
+        "units": "datetime",
+        "time_step": "由 --timestep-hours 显式声明并与时间列推断值一致",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "空值或重复值必须停止。"
+      },
+      "volume_error_relative": {
+        "name": "volume_error_relative",
+        "semantics": "洪量相对误差，定义为 (观测洪量 - 模拟洪量) / 观测洪量。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "观测洪量为 0 时记为 unavailable。"
+      },
+      "peak_time_error_hours": {
+        "name": "peak_time_error_hours",
+        "semantics": "峰现时间误差，定义为模拟峰时刻减观测峰时刻，正值为模拟峰现偏晚。",
+        "units": "h",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "并列峰时取首个最大值，并给出 warning。"
+      },
+      "nse": {
+        "name": "nse",
+        "semantics": "标准纳什效率系数；观测方差为 0 时记为 unavailable。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不适用时记为 unavailable，不写 NaN。"
+      },
+      "r2": {
+        "name": "r2",
+        "semantics": "决定系数，采用 scikit-learn 约定；观测为常数序列时给出边界值而非 unavailable。",
+        "units": "dimensionless",
+        "state_or_flux": "not_applicable",
+        "accumulated_or_instantaneous": "not_applicable",
+        "missing_value_semantics": "不适用时记为 unavailable，不写 NaN。"
+      }
+    }
+  },
+  "visualization-reporting/visualize-dem-hydrology-atlas": {
+    "stage": "atlas",
+    "variables": {}
+  },
+  "visualization-reporting/visualize-flood-event-atlas": {
+    "stage": "atlas",
+    "variables": {}
+  },
+  "visualization-reporting/visualize-hydrobase-atlas": {
+    "stage": "atlas",
+    "variables": {}
+  },
+  "visualization-reporting/visualize-model-calibration": {
+    "stage": "atlas",
+    "variables": {}
+  }
+}
