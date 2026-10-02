@@ -144,6 +144,8 @@ def process_figure(frame,stem,title,language,style,result_path,source,warnings):
     sources=[source]+frame.attrs.get("comparison_sources",[])
     meta=m.figure_meta("validation-process",language,title,result_path,sources,warnings,["NSE = 1 - sum((sim-obs)^2)/sum((obs-mean(obs))^2), scored=true samples within this figure only; display diagnostic, upstream metrics unchanged","unscored samples shaded; explicit comparison keys; no visible titles"])
     meta["simulation_metrics"]=bindings;meta["unit"]=frame.attrs.get("unit");meta["scope"]={"split":"validation","event_ids":frame["event_id"].astype(str).unique().tolist() if "event_id" in frame else [],"scored_only":True}
+    if 'event_slice' in frame.attrs:
+        meta['event_slice'] = frame.attrs['event_slice']
     return m.save_figure(fig,stem,meta)
 
 

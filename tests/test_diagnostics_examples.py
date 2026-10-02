@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import hashlib
 
 import numpy as np
 import pandas as pd
@@ -47,6 +48,22 @@ def _result(output: Path) -> dict:
     return json.loads((output / "result.json").read_text(encoding="utf-8"))
 
 
+def test_metrics_exclude_explicit_warmup(repo_root, tmp_path):
+    frame = _event_frame(12)
+    frame['scored'] = [False, False] + [True] * 10
+    frame['is_warmup'] = [True, True] + [False] * 10
+    frame.loc[:1, 'XAJ_output'] = 99999
+    path = tmp_path / 'scoring.csv'; frame.to_csv(path, index=False)
+    out = tmp_path / 'scoring-metrics'
+    r = _run(repo_root, 'series', '--series', path, '--simulated-column', 'XAJ_output', '--timestep-hours', 1, '--output-dir', out)
+    assert r.returncode == 0, r.stderr
+    metrics = pd.read_csv(out/'series_metrics.csv').set_index('metric')['value']
+    a = frame.iloc[2:]['Q_obs'].to_numpy(); b = frame.iloc[2:]['XAJ_output'].to_numpy()
+    expected = 1 - np.sum((a-b)**2) / np.sum((a-a.mean())**2)
+    assert float(metrics['nse']) == pytest.approx(expected)
+    assert _result(out)['parameters']['scoring_policy'] == 'exclude_unscored_and_warmup'
+
+
 @pytest.mark.parametrize("key", sorted(SCRIPTS))
 def test_diagnostics_examples_have_help(repo_root: Path, key: str) -> None:
     result = _run(repo_root, key, "--help")
@@ -77,6 +94,11 @@ def test_event_metrics_and_aggregation_roundtrip_on_unicode_paths(repo_root: Pat
     event_document = _result(event_dir)
     assert event_document["skill"] == "evaluation-diagnostics/compute-event-flood-metrics"
     assert event_document["parameters"]["volume_unit"] == "10k m3"
+    input_refs = [v for v in event_document['inputs'].values() if isinstance(v, dict)]
+    assert len(input_refs) == 2
+    for reference in input_refs:
+        path = (event_dir / reference['path']).resolve()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == reference['sha256']
 
     metrics = pd.read_csv(event_dir / "event_metrics.csv")
     assert len(metrics) == 2

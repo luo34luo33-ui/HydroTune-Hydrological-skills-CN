@@ -26,6 +26,7 @@ from _diagnostics_common import (
     read_json,
     read_table,
     require_columns,
+    scored_frame,
     rmse,
     write_result,
     write_table,
@@ -110,6 +111,7 @@ def _evaluate_event(
     args: argparse.Namespace,
     thresholds: dict[str, float],
 ) -> tuple[dict[str, Any], list[dict[str, str]], list[str]]:
+    frame = scored_frame(frame)
     require_columns(frame, [args.time_column, args.observed_column, args.simulated_column], label)
     checks: list[dict[str, str]] = []
     warnings: list[str] = []
@@ -258,6 +260,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         inputs["events"] = file_reference(Path(args.events), args.output_dir)
     else:
         inputs["events_dir"] = str(Path(args.events_dir))
+        for index, path in enumerate(sorted(Path(args.events_dir).iterdir())):
+            if path.is_file() and path.suffix.lower() in TABLE_SUFFIXES:
+                inputs[f"event_file_{index:04d}"] = file_reference(path, args.output_dir)
     return {
         "schema_version": "1.0",
         "skill": SKILL_REF,
@@ -270,6 +275,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "observed_column": args.observed_column,
             "simulated_column": args.simulated_column,
             "time_column": args.time_column,
+            "event_id_column": args.event_id_column,
+            "scoring_policy": "exclude_unscored_and_warmup",
         },
         "inputs": inputs,
         "artifacts": {"event_metrics": file_reference(table_path, args.output_dir)},

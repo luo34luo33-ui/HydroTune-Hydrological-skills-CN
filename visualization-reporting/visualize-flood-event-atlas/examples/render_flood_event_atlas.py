@@ -67,25 +67,28 @@ def load_rainfall(args, series, process, upstream):
     if expected_step is not None and not np.isclose(step, float(expected_step)):
         raise AtlasError("雨量与流量时间步不同；先在上游显式对齐，不自动重采样")
     rain = pd.read_csv(path, encoding="utf-8-sig")
-    if not {"time", "P_mm"}.issubset(rain.columns) or rain.empty:
-        raise AtlasError("雨量 CSV 必须包含 time,P_mm，且不能为空")
+    if not {"time", "P_mm"}.issubset(rain.columns):
+        raise AtlasError("雨量 CSV 必须包含 time,P_mm")
+    parsed_times = []
     for raw in rain["time"]:
         stamp = pd.Timestamp(raw)
-        if stamp.tzinfo is None or stamp.utcoffset() != stamp.tz_convert(zone).utcoffset():
+        if pd.isna(stamp) or stamp.tzinfo is None or stamp.utcoffset() != stamp.tz_convert(zone).utcoffset():
             raise AtlasError("雨量时间戳必须带偏移且与声明时区一致")
-    rain["time"] = pd.to_datetime(rain["time"], utc=True, errors="raise")
+        parsed_times.append(stamp.tz_convert("UTC"))
+    rain["time"] = pd.DatetimeIndex(parsed_times, tz="UTC")
     rain["P_mm"] = pd.to_numeric(rain["P_mm"], errors="raise")
-    if not np.isfinite(rain["P_mm"]).all() or (rain["P_mm"] < 0).any():
-        raise AtlasError("雨量存在缺测、非有限值或负值；不填零")
+    if np.isinf(rain["P_mm"]).any() or (rain["P_mm"] < 0).any():
+        raise AtlasError("雨量存在无穷值或负值")
     rain = rain.sort_values("time")
-    if rain["time"].duplicated().any() or not np.allclose(rain["time"].diff().dropna().dt.total_seconds(), step):
-        raise AtlasError("雨量时间轴重复、缺步或不符合声明时间步")
+    if rain["time"].duplicated().any():
+        raise AtlasError("雨量时间轴存在重复时间")
     if metadata["timestamp_semantics"] == "interval_start":
         rain["time"] += pd.Timedelta(seconds=step)
     required = pd.DatetimeIndex(pd.to_datetime(pd.concat([series["time"], process["time"]]), utc=True).unique()).sort_values()
+    offsets = (pd.DatetimeIndex(rain["time"]) - required[0]).total_seconds().to_numpy() / step
+    if not np.allclose(offsets, np.round(offsets), rtol=0, atol=1e-9):
+        raise AtlasError("雨量时间不符合流量时间步网格；不自动重采样")
     aligned = rain.set_index("time").reindex(required)
-    if aligned["P_mm"].isna().any():
-        raise AtlasError("雨量未覆盖流量序列及事件预热窗口；不自动填补")
     aligned.index = aligned.index.tz_convert(series["time"].iloc[0].tzinfo)
     aligned = aligned.reset_index(names="time")
     return aligned, step, {"rainfall": file_reference(path), "rainfall_metadata": file_reference(metadata_path)}
@@ -135,6 +138,9 @@ def run(args: argparse.Namespace) -> dict:
     rain, rain_step, rain_sources = load_rainfall(args, series, process, upstream)
     if rain is None:
         warnings.append("未提供流域平均雨量，雨量柱及右侧雨量轴未绘制" if args.language == "zh" else "Basin mean rainfall unavailable; rainfall bars and right axis omitted")
+    elif rain["P_mm"].isna().any():
+        count = int(rain["P_mm"].isna().sum())
+        warnings.append(f"雨量绘图范围有 {count} 个缺测时步；仅绘制已有雨量，不填零或插补" if args.language == "zh" else f"Rainfall missing at {count} display steps; only observed rainfall is plotted, without zero filling or interpolation")
     status = "warning" if warnings else "success"
     sources = {"extract_result": file_reference(result_path)}
     sources.update(rain_sources)

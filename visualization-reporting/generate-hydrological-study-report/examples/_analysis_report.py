@@ -201,6 +201,9 @@ def simulation(report,cfg,manifest_path):
     for run in report['runs']:
         for sid in run['evaluations']:
             s=bysource[sid]; ctx=s['context']; rs=rows_for(s,['metric']); mode=ctx['mode']; split=ctx['split']
+            event_column = read_json(s['result']['path'])['parameters'].get('event_id_column', 'event_id')
+            if mode == 'event_collection' and event_column != 'event_id':
+                rs = [{**r, 'event_id': r.get(event_column)} for r in rs]
             definitions={e['locator'].rsplit('/',1)[-1]:(e['unit'],e['definition']) for e in report['evidence'] if e['source_id']==sid}
             if mode=='continuous':
                 for r in rs:
@@ -228,9 +231,18 @@ def simulation(report,cfg,manifest_path):
                     d=dict(run=run['id'],evaluation=sid,split=split,event_id=str(r['event_id']),available=False,reason='No explicitly linked process')
                     if m: d.update(process_diagnostic(m,r,manifest_path,read_json(s['result']['path'])['parameters'].get('timestep_hours')))
                     diagnoses.append(d)
+    names = {r['id']: r['name'] for r in report['runs']}
+    for row in metrics:
+        row['run_name'] = names[row['run']]
+        row.setdefault('period', bysource[row['evaluation']]['context']['period'])
+    for item in a['tables']:
+        if item['section'] == 'worst':
+            for row in item['rows']:
+                if row.get('run') in names:
+                    row['run_name'] = names[row['run']]
     metrics.sort(key=lambda r:(r['split']!='validation',r['run'],r['evaluation'],r['metric']))
     table(a,'evaluation','总体指标 / Overall metrics',metrics)
-    table(a,'calibration','评价分组 / Evaluation groups',[dict(run=r['id'],evaluation=sid,split=bysource[sid]['context']['split'],mode=bysource[sid]['context']['mode']) for r in report['runs'] for sid in r['evaluations']])
+    table(a,'calibration','评价分组 / Evaluation groups',[dict(run=r['id'],run_name=r['name'],evaluation=sid,split=bysource[sid]['context']['split'],mode=bysource[sid]['context']['mode'],period=bysource[sid]['context']['period']) for r in report['runs'] for sid in r['evaluations']])
     calibration=[]
     for e in report['evidence']:
         field=e['locator'].rsplit('/',1)[-1]
@@ -395,7 +407,7 @@ def formatted(k,v):
         return display(v,digits)
     return md(v)
 
-LABELS={'item':'项目','value':'数值','unit':'单位','source':'资料集合','basis':'分级依据','size':'规模','count':'有效数量','percent':'比例（%）','denominator':'比例分母','missing':'缺失数量','lower_threshold':'下阈值','upper_threshold':'上阈值','shape':'峰型','metric':'指标','mean':'均值','median':'中位数','p10':'P10','p90':'P90','min':'最小值','max':'最大值','month':'月份','level':'级别/层级','run':'模型运行','evaluation':'评价集合','split':'评价分组','mode':'评价模式','period':'评价时段','unavailable':'不可用数量','total':'总样本数','event_id':'事件','start':'开始','end':'结束','start_time':'开始','end_time':'结束','nse':'NSE','peak_error_relative':'洪峰相对误差','volume_error_relative':'洪量相对误差','peak_time_error_hours':'峰现时间误差（小时）','subbasin':'子流域','reach_count':'河段数量','definition':'定义'}
+LABELS={'run_name':'运行名称','item':'项目','value':'数值','unit':'单位','source':'资料集合','basis':'分级依据','size':'规模','count':'有效数量','percent':'比例（%）','denominator':'比例分母','missing':'缺失数量','lower_threshold':'下阈值','upper_threshold':'上阈值','shape':'峰型','metric':'指标','mean':'均值','median':'中位数','p10':'P10','p90':'P90','min':'最小值','max':'最大值','month':'月份','level':'级别/层级','run':'模型运行','evaluation':'评价集合','split':'评价分组','mode':'评价模式','period':'评价时段','unavailable':'不可用数量','total':'总样本数','event_id':'事件','start':'开始','end':'结束','start_time':'开始','end_time':'结束','nse':'NSE','peak_error_relative':'洪峰相对误差','volume_error_relative':'洪量相对误差','peak_time_error_hours':'峰现时间误差（小时）','subbasin':'子流域','reach_count':'河段数量','definition':'定义'}
 VALUE_LABELS={'small':'小洪水','medium':'中洪水','large':'大洪水','single':'单峰','multiple':'多峰','unclassified':'无法分类','calibration':'率定','validation':'验证','continuous':'连续','event_collection':'场次集合','events':'洪水场次数','subbasin_count':'子流域数量','raster_subbasin_area_sum':'子流域栅格面积合计','total_length':'河段总长度','headwater_count':'源头河段数量','outlet_count':'出口数量','confluence_nodes':'汇合节点数量','outlet_reach':'出口河段','peak_flow_m3_s':'洪峰流量','total_volume_m3':'总洪量','duration_hours':'历时','area_km2':'面积','length_m':'长度','prominence_m3_s':'洪峰突出度','minimum_spacing_hours':'最小峰间隔','mean_residual':'整体平均模拟减观测偏差','peak_residual':'观测峰时模拟减观测偏差','rising_mean_residual':'涨水段平均偏差','recession_mean_residual':'退水段平均偏差','warmup_rows':'warm-up 行数','excluded_unscored_rows':'其他未评分行数','scored_rows':'评分行数'}
 
 def render_analysis(report):
@@ -413,12 +425,14 @@ def render_analysis(report):
             fields=sorted({k for r in t['rows'] for k in r}, key=lambda k: (list(LABELS).index(k) if k in LABELS else 999,k))
             # Full values stay in CSV/JSON. Body tables show only decision-relevant columns.
             if report['report_type']=='simulation' and t['section']=='worst' and 'event_id' in fields:
-                fields=[k for k in ('event_id','start','end','nse','volume_error_relative','peak_error_relative','peak_time_error_hours') if k in fields]
+                fields=[k for k in ('run_name','evaluation','event_id','start','end','nse','volume_error_relative','peak_error_relative','peak_time_error_hours') if k in fields]
             if len(fields)>12 and 'metric' in fields:
-                fields=[k for k in ('run','split','metric','value','mean','median','p10','p90','count','unavailable','unit') if k in fields]
+                fields=[k for k in ('run_name','evaluation','split','period','metric','value','mean','median','count','unavailable','unit') if k in fields]
             lines+=['| '+' | '.join(k if en else LABELS.get(k,k) for k in fields)+' |','| '+' | '.join('---' for _ in fields)+' |']
             visible=t['rows'][:60] if report['report_type']=='spatial' and t['section']=='model-inputs' else t['rows']
             def cell(k,r):
+                if k == 'period' and isinstance(r.get(k), dict):
+                    return md(r[k].get('start', '')) + ' — ' + md(r[k].get('end', ''))
                 value=display(r[k],1) if k=='value' and r.get('unit')=='percent' and numeric(r.get(k)) else formatted(k,r.get(k))
                 if k=='value' and r.get('unit')=='identifier': value=md(r.get(k))
                 return value if en else VALUE_LABELS.get(str(r.get(k)),value)

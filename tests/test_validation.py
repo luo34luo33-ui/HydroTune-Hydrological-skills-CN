@@ -91,6 +91,7 @@ def test_repository_skeleton_is_valid(repo_root: Path) -> None:
         "hydrological-modeling/run-lumped-topmodel",
         "post-processing/correct-residual-with-ml",
         "post-processing/align-observed-simulated-discharge",
+        "post-processing/ensemble-discharge-with-bma",
         "evaluation-diagnostics/compute-event-flood-metrics",
         "evaluation-diagnostics/compute-continuous-series-metrics",
         "evaluation-diagnostics/aggregate-event-metrics",
@@ -145,6 +146,7 @@ def test_category_readmes_are_not_discovered_as_skills(repo_root: Path) -> None:
         "hydrological-modeling/run-lumped-topmodel",
         "post-processing/correct-residual-with-ml",
         "post-processing/align-observed-simulated-discharge",
+        "post-processing/ensemble-discharge-with-bma",
         "evaluation-diagnostics/compute-event-flood-metrics",
         "evaluation-diagnostics/compute-continuous-series-metrics",
         "evaluation-diagnostics/aggregate-event-metrics",
@@ -156,7 +158,7 @@ def test_valid_atomic_fixture_passes(repo_copy: Path) -> None:
     issues, records = validate_skills(repo_copy)
     assert issues == []
     assert "data-processing/test-skill" in {record.source_ref for record in records}
-    assert len(records) == 41
+    assert len(records) == 42
 
 
 def test_unknown_category_skill_is_rejected(repo_copy: Path) -> None:

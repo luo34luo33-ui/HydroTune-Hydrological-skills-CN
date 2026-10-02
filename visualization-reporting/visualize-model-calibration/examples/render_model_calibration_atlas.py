@@ -61,6 +61,28 @@ def prepare(out:Path,overwrite:bool)->None:
         for p in out.iterdir():
             if p.is_file() and (p.name=="result.json" or p.name.startswith(PREFIXES)):p.unlink()
 
+
+def protect_inputs(args):
+    """Check destinations before deleting or writing any plot artifacts."""
+    result_path = args.calibration_result.resolve()
+    result = read_json(result_path)
+    inputs = [result_path]
+    for field in ('artifacts', 'inputs'):
+        for reference in result.get(field, {}).values():
+            if isinstance(reference, dict) and 'path' in reference:
+                inputs.append((result_path.parent / reference['path']).resolve())
+    for path, key in [(args.event_manifest, 'events'), (args.comparison_manifest, 'series')]:
+        if not path:
+            continue
+        path = path.resolve(); inputs.append(path)
+        doc = read_json(path)
+        refs = [doc[key]] if key == 'events' else doc[key]
+        inputs.extend((path.parent / item['path']).resolve() for item in refs)
+    if args.output_dir.is_symlink():
+        raise ContractError('输出目录不能是符号链接')
+    if any(path == args.output_dir or args.output_dir in path.parents for path in inputs):
+        raise ContractError('输出目录不得包含绘图输入；请使用独立目录')
+
 def setup_style(style:dict,language:str)->dict:
     colors=style["colors"]
     plt.rcParams.update({"font.family":style["typography"][language], "font.size":16,
@@ -124,6 +146,13 @@ def run(args)->dict:
     comparison_sources=attach_comparisons(series,args.comparison_manifest,result.get("data_shape"))
     series.attrs["comparison_sources"]=comparison_sources
 
+    slices = []
+    event_sources = []
+    if args.event_manifest:
+        if result.get('data_shape') != 'continuous':
+            raise ContractError('--event-manifest requires continuous calibration results')
+        from _event_slices import event_slices
+        slices, event_sources = event_slices(series, args.event_manifest, paths['validation_series'], args.max_events)
     if "precipitation" not in series: warnings.append("validation series 未提供 precipitation；过程图省略降水面板")
     artifacts={};overview=render_overview(trace,best,cal,val,result,args.output_dir,args.language,args.style,result_path,list(paths.values()),warnings)
     for key,path in overview.items():artifacts[f"overview_{key}"]=ref(path,args.output_dir)
@@ -135,20 +164,31 @@ def run(args)->dict:
         for index,event_id in enumerate(selected,1):
             subset=series[series["event_id"].astype(str)==event_id].reset_index(drop=True);subset.attrs=series.attrs.copy();stem=args.output_dir/f"validation_event_{index:03d}";title=f"{labels(args.language)['process']} · {event_id}";process_outputs.append(process_figure(subset,stem,title,args.language,args.style,result_path,paths["validation_series"],warnings))
     else:process_outputs.append(process_figure(series,args.output_dir/"validation_process",labels(args.language)["process"],args.language,args.style,result_path,paths["validation_series"],warnings))
+    for index, (event_id, subset) in enumerate(slices, 1):
+        stem = args.output_dir / f'validation_event_{index:03d}'
+        process_outputs.append(process_figure(subset, stem, f"{labels(args.language)['process']} · {event_id}", args.language, args.style, result_path, paths['validation_series'], warnings))
     for i,item in enumerate(process_outputs,1):
         for key,path in item.items():artifacts[f"process_{i:03d}_{key}"]=ref(path,args.output_dir)
     scatter=render_scatter(series,args.output_dir,args.language,args.style,result_path,paths["validation_series"],warnings)
     for key,path in scatter.items():artifacts[f"scatter_{key}"]=ref(path,args.output_dir)
-    status="warning" if warnings else "success";document={"schema_version":"1.0","skill":SKILL_REF,"status":status,"message":"model calibration atlas rendered","parameters":{"language":args.language,"max_events":args.max_events},"inputs":{"calibration_result":ref(result_path), **{f"comparison_{i}":ref(p) for i,p in enumerate(comparison_sources)}},"artifacts":artifacts,"checks":[{"check":"source_hashes","status":"PASS","details":f"verified={len(paths)}"},{"check":"fixed_canvas","status":"PASS","details":"all PNG figures are 2400x1600"},{"check":"validation_only_scatter","status":"PASS","details":"scatter used validation scored rows only"}],"warnings":warnings,"provenance":{"python":sys.version.split()[0],"matplotlib":importlib.metadata.version("matplotlib"),"pandas":importlib.metadata.version("pandas")}}
+    status="warning" if warnings else "success"
+    input_refs = {"calibration_result": ref(result_path),
+                  **{f"comparison_{i}": ref(p) for i, p in enumerate(comparison_sources)}}
+    if event_sources:
+        input_refs.update(event_manifest=ref(event_sources[0]), event_list=ref(event_sources[1]))
+    document={"schema_version":"1.0","skill":SKILL_REF,"status":status,"message":"model calibration atlas rendered","parameters":{"language":args.language,"max_events":args.max_events},"inputs":input_refs,"artifacts":artifacts,"checks":[{"check":"source_hashes","status":"PASS","details":f"verified={len(paths)}"},{"check":"fixed_canvas","status":"PASS","details":"all PNG figures are 2400x1600"},{"check":"validation_only_scatter","status":"PASS","details":"scatter used validation scored rows only"}],"warnings":warnings,"provenance":{"python":sys.version.split()[0],"matplotlib":importlib.metadata.version("matplotlib"),"pandas":importlib.metadata.version("pandas")}}
     write_json(args.output_dir/"result.json",document);return document
 
 def main(argv=None)->int:
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument("--calibration-result",type=Path,required=True);p.add_argument("--comparison-manifest",type=Path);p.add_argument("--simulation-label");p.add_argument("--flow-unit");p.add_argument("--language",choices=("zh","en"),required=True);p.add_argument("--max-events",type=int);p.add_argument("--output-dir",type=Path,required=True);p.add_argument("--overwrite",action="store_true");a=p.parse_args(argv)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument("--calibration-result",type=Path,required=True);p.add_argument("--comparison-manifest",type=Path);p.add_argument("--event-manifest",type=Path);p.add_argument("--simulation-label");p.add_argument("--flow-unit");p.add_argument("--language",choices=("zh","en"),required=True);p.add_argument("--max-events",type=int);p.add_argument("--output-dir",type=Path,required=True);p.add_argument("--overwrite",action="store_true");a=p.parse_args(argv)
     if a.max_events is not None and a.max_events<1:p.error("--max-events must be positive")
     a.output_dir=a.output_dir.resolve()
+    prepared = False
     try:
-        prepare(a.output_dir,a.overwrite);style_path=Path(__file__).resolve().parents[1]/"assets"/"calibration-atlas-style-v2.json";a.style=read_json(style_path);setup_style(a.style,a.language);document=run(a);print(f"{document['status']}: {document['message']}");return 0
+        protect_inputs(a)
+        prepare(a.output_dir,a.overwrite);prepared = True
+        style_path=Path(__file__).resolve().parents[1]/"assets"/"calibration-atlas-style-v2.json";a.style=read_json(style_path);setup_style(a.style,a.language);document=run(a);print(f"{document['status']}: {document['message']}");return 0
     except Exception as exc:
-        if a.output_dir.is_dir():write_json(a.output_dir/"result.json",{"schema_version":"1.0","skill":SKILL_REF,"status":"error","message":str(exc),"parameters":{"language":a.language},"inputs":{},"artifacts":{},"checks":[],"warnings":[],"provenance":{}})
+        if prepared:write_json(a.output_dir/"result.json",{"schema_version":"1.0","skill":SKILL_REF,"status":"error","message":str(exc),"parameters":{"language":a.language},"inputs":{},"artifacts":{},"checks":[],"warnings":[],"provenance":{}})
         print(f"error: {exc}",file=sys.stderr);return 1
 if __name__=="__main__":raise SystemExit(main())

@@ -66,12 +66,14 @@ def _source_frame(rows: int = 240) -> pd.DataFrame:
 
 def _write_config(path: Path) -> None:
     document = {
-        "schema_version": "1.0",
+        "schema_version": "1.2",
         "peak_detection": {"peak_quantile": 0.7, "prominence_factor": 0.05, "min_peak_distance_hours": 24},
         "boundaries": {"boundary_fraction": 0.05, "boundary_persistence_steps": 2, "max_search_days": 4},
         "merging": {"merge_gap_hours": 12, "valley_ratio_threshold": 0.8},
         "filters": {"min_event_duration_hours": 1, "min_peak_flow_m3_s": None, "min_event_volume_m3": None},
         "warmup": {"steps": 12},
+        "rainfall_support": {"lookback_hours": 24, "min_observed_rainfall_mm": 5,
+                             "no_rainfall_policy": "exclude", "missing_rainfall_policy": "exclude"},
     }
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
@@ -95,9 +97,16 @@ def _pipeline(repo: Path, root: Path, output_format: str = "csv") -> tuple[Path,
     assert separated.returncode == 0, separated.stderr
     config = root / "事件 参数（显式）.yaml"
     _write_config(config)
+    rainfall = root / "流域 雨量.csv"
+    pd.DataFrame({"time": pd.date_range("2019-12-31", periods=264, freq="h", tz="UTC"),
+                  "P_mm": np.ones(264)}).to_csv(rainfall, index=False)
+    rain_meta = root / "雨量 元数据.json"
+    rain_meta.write_text(json.dumps({"spatial_scope": "basin_mean", "unit": "mm/step", "timezone": "UTC",
+                                    "timestep_seconds": 3600, "timestamp_semantics": "interval_end"}), encoding="utf-8")
     event_dir = root / "03 事件（结果）"
     extracted = _run(
         repo, "extract", "--baseflow-result", baseflow_dir / "result.json", "--config", config,
+        "--rainfall", rainfall, "--rainfall-metadata", rain_meta,
         "--output-format", output_format, "--per-event-format", "csv", "--output-dir", event_dir,
     )
     assert extracted.returncode == 0, extracted.stderr
@@ -202,6 +211,7 @@ def test_event_config_is_strict_and_scientific_qc_uses_exit_code_two(
     monkeypatch.setattr(module, "run", lambda args: (_ for _ in ()).throw(module.ScientificQCError("synthetic QC failure")))
     code = module.main([
         "--baseflow-result", str(tmp_path / "upstream.json"), "--config", str(config),
+        "--rainfall", str(tmp_path / "rain.csv"), "--rainfall-metadata", str(tmp_path / "metadata.json"),
         "--output-dir", str(output),
     ])
     assert code == 2
@@ -317,5 +327,5 @@ def test_flood_atlas_rainfall_alignment_units_and_paper_layout(repo_root: Path, 
     meta_path.write_text(json.dumps(metadata), encoding="utf-8")
     frame = pd.read_csv(rain_path).iloc[:-1]
     frame.to_csv(rain_path, index=False)
-    with pytest.raises(common.AtlasError, match="未覆盖"):
-        module.load_rainfall(args, series, process, {"parameters": {"timestep_seconds": 3600}})
+    partial, _, _ = module.load_rainfall(args, series, process, {"parameters": {"timestep_seconds": 3600}})
+    assert partial.P_mm.iloc[:3].tolist() == [0, 2, 4] and pd.isna(partial.P_mm.iloc[3])

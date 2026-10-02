@@ -6,7 +6,11 @@
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
+  "split_periods": {
+    "calibration": {"start": "2011-01-01T00:00:00+08:00", "end": "2019-12-31T23:00:00+08:00"},
+    "validation": {"start": "2020-01-01T00:00:00+08:00", "end": "2020-12-31T23:00:00+08:00"}
+  },
   "title": "流域降雨径流研究",
   "language": "zh",
   "required_preprocessing": ["discharge", "forcing"],
@@ -16,13 +20,16 @@
     {"id": "hbv", "stage": "simulation", "result": "hbv/result.json"},
     {"id": "hbv-validation", "stage": "evaluation", "result": "metrics/result.json",
      "context": {"mode": "continuous", "split": "validation",
-                 "period": {"start": "2020-01-01", "end": "2020-12-31"}}}
+                 "period": {"start": "2020-01-01T00:00:00+08:00", "end": "2020-12-31T23:00:00+08:00"}}}
   ],
-  "runs": [{"id": "hbv-run", "simulation": "hbv", "evaluations": ["hbv-validation"]}]
+  "runs": [{"id": "hbv-run", "name": "HBV", "kind": "baseline",
+            "simulation": "hbv", "evaluations": ["hbv-validation"],
+            "series": {"path": "hbv/simulation_table.csv", "sha256": "填写实际文件的64位SHA-256",
+                       "time_column": "time", "simulated_column": "Q_total", "unit": "m3/s"}}]
 }
 ```
 
-stage 可选 preprocessing、spatial、simulation、calibration、evaluation、atlas；支持的当前上游技能和变量定义见 `assets/upstream-catalog.json`。未知技能和非 1.0 契约拒绝使用。可选 source.run_id 将图册等成果关联到已有运行；不得与 simulation/evaluation/calibration 的运行绑定冲突。评价必须显式声明 mode 和 split；continuous 指定 period，event_collection 指定 event_ids。此范围来自用户清单，报告会注明其来源；可读取的已哈希评价输入会核对时段或事件，独立语义审查还须检查 split 和模型关系，不能将声明当作已验证事实。
+stage 可选 preprocessing、spatial、simulation、postprocessing、calibration、evaluation、atlas；支持的当前上游技能和变量定义见 `assets/upstream-catalog.json`。未知技能和非 1.0 契约拒绝使用。可选 source.run_id 将图册等成果关联到已有运行；不得与 simulation/evaluation/calibration 的运行绑定冲突。评价必须声明 mode、split 和带时区的 period；event_collection 另指定 event_ids。读取已哈希评价输入并按 scored/is_warmup 排除非评分行，核对真实时间、观测和模拟列。缺少输入证据、跨分界事件、范围冲突或运行身份不符时停止。
 
 ## prepare → Agent → finalize
 
@@ -60,7 +67,7 @@ report.md、report.json、summary.csv、evidence-index.json/.csv、data-gaps.jso
 
 ## 新版模拟汇总与过程诊断
 
-预处理现在可省略；仍需每个运行的模拟与评价成果。固定章节为总体结论、评价范围与总体指标、率定与验证表现、NSE 最低事件、可能误差来源、限制与建议。业务 summary.csv 仅含汇总统计，不含哈希或字段定位。report.json 输出版本 2.0，旧清单版本仍为 1.0。
+预处理现在可省略；仍需每个运行的模拟与评价成果。固定章节为总体结论、评价范围与总体指标、率定与验证表现、NSE 最低事件、可能误差来源、限制与建议。业务 summary.csv 仅含汇总统计，不含哈希或字段定位。report.json 输出版本 2.0，研究清单也升级为 2.0；旧清单必须迁移后再生成或审查。
 
 清单 analysis.worst_event_count 默认 5。事件统计均为不加权汇总，P10/P90 使用线性插值，逐指标报告有效数与不可用数。不存在上游合格判断时不生成合格率。最差事件按每个评价来源分别筛选，因此不会混合不同单位、时段或 split。
 
@@ -88,3 +95,16 @@ report.md、report.json、summary.csv、evidence-index.json/.csv、data-gaps.jso
 使用 inference 类型并在 evidence_ids 引用对应过程与指标证据。独立语义审查判断解释是否受支持，不自动认可上述示例。正文、图件、业务表均不展示技术核验台账。
 
 每个有过程证据的入选事件都必须有一个 inference 段落，其 diagnosis 为 {"run": "运行 ID", "evaluation": "评价来源 ID", "event_id": "事件 ID"}，填写 hypotheses 并引用 prepare 提供的 process-* 证据。其他数字仍需 numeric_bindings。过程 flow_unit 默认且仅支持 m3/s；提供降雨列时必须显式指定 precipitation_unit: "mm/step"，不静默换算。
+
+## 从旧研究清单迁移
+
+1. 将 schema_version 改为 2.0，补齐 split_periods.calibration/validation；时间必须有显式时区，区间端点均包含且不可重叠。
+2. 为每个 run 补齐非空且互不重复的 name、kind 和 series（path、sha256、time_column、simulated_column、unit；XLSX 另填 sheet）。series 必须是该 simulation 来源的真实 artifact。
+3. 每个评价来源补齐 period，并保留指标 result.inputs 中的原始评分表及哈希。模拟列按时间与 run.series 精确核对，不按行号猜测。事件指标表必须保留 start/end 或 start_time/end_time，与完整评分过程一致。预热行不参与范围判断。
+4. 旧的全时段事件集合不得统一写 validation；拆成对应时段的真实评价成果。跨分界事件拒绝使用，不自动切断。
+
+校正运行使用独立 ID，例如 xaj-corrected；kind=corrected、parent_run=xaj-baseline、simulation 和 postprocessing 均指向 stage=postprocessing 的残差校正预测 result。series 指向 corrected_table 的校正列；预测表必须保留 parameters.base_column 对应的基准列，其数值要与 parent_run 一致，并保存 model_used artifact。
+
+可用 comparisons 数组显式声明对比：`{"evaluations":["eval-baseline","eval-corrected"]}`。两来源须属于不同运行，且观测、评分时间、事件集合、mode 和 split 完全一致；校正与父运行同一分组的评价也自动检查同样的样本可比性。不同样本时先统一评价输入并重算指标，报告不偷偷求交集或替换上游指标。表格同时保留运行名称、评价来源和时段。数值按已有文件的解析值精确匹配；导出切片时应保留数值精度。
+
+旧指标成果的输入若包含非评分或预热行、但未声明 scoring_policy=exclude_unscored_and_warmup，必须用当前评价 skill 重生成指标；报告不会把未评分行自行从已有指标中扣除。

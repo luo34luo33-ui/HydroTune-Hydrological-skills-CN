@@ -1,4 +1,4 @@
-schema_version: "1.0"
+schema_version: "1.2"
 peak_detection:
   peak_quantile: 0.90
   prominence_factor: 0.25
@@ -16,3 +16,18 @@ filters:
   min_event_volume_m3: 25000000
 warmup:
   steps: 72
+# 原流量参数保留；新增雨量参数仅用于演示，不能用于复现旧版纯流量输出。
+# 正式运行前必须按目标流域显式确认这两个科学参数。
+rainfall_support:
+  lookback_hours: 24
+  min_observed_rainfall_mm: 5
+  # 推荐值，正式运行前须分别取得用户选择，不把复制示例视为用户已确认。
+  no_rainfall_policy: exclude
+  missing_rainfall_policy: exclude
+# 可配置的保守推荐值；省略整个区块或其中字段时脚本补齐并记录实际值。
+shape_filter:
+  min_plateau_duration_hours: 24
+  min_plateau_fraction: 0.5
+  plateau_range_fraction: 0.005
+  min_jump_fraction: 0.1
+  jump_window_steps: 2

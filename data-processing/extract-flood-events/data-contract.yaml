@@ -6,12 +6,20 @@ inputs:
     required: true
     format: JSON
   - id: event_config
-    description: 通过 flood-event-config schema 的完整显式参数配置。
+    description: 通过 flood-event-config 1.2 schema 的显式识别/降雨参数和用户确认策略；shape_filter 可省略字段并使用已声明推荐值。
     required: true
     format: YAML
+  - id: rainfall
+    description: 流域平均降雨表 time,P_mm，单位 mm/step；可有空值或缺行，不填补。
+    required: true
+    format: CSV, Parquet or XLSX
+  - id: rainfall_metadata
+    description: JSON，含 spatial_scope=basin_mean、unit=mm/step、timezone、timestep_seconds、timestamp_semantics=interval_start 或 interval_end。
+    required: true
+    format: JSON
 outputs:
   - id: event_summary
-    description: 每个事件的边界、洪峰、历时、洪量和分量比例。
+    description: 每个保留事件的边界、洪峰、历时、洪量、分量比例，以及形态与降雨筛选证据。
     required: true
     format: CSV, Parquet or XLSX sheet
   - id: event_process
@@ -26,6 +34,10 @@ outputs:
     description: 运行状态、参数、QC 与文件哈希。
     required: true
     format: JSON
+  - id: rainfall_screening
+    description: 通过规模过滤的每个候选事件，含 candidate_id、保留后的 event_id、边界、恒定段/突跳证据、降雨窗口/覆盖/累计量、rainfall_supported、rainfall_accepted、用户策略、shape_rejected、最终 retained 和 reason。
+    required: true
+    format: CSV
 warmup_period:
   required: false
   semantics: 按配置步数在事件起点前导出，仅用于上下文，不参与事件指标。
@@ -33,3 +45,13 @@ invariants:
   - 事件 ID 唯一、按时间稳定排序且 start 不晚于 peak、peak 不晚于 end。
   - 最终事件不得重叠，warm-up 不得进入事件指标。
   - 总洪量必须在数值容差内等于基流洪量加直接径流洪量。
+  - 配置版本为 1.2；lookback_hours 为有限非负数，min_observed_rainfall_mm 为有限正数，均显式提供。
+  - no_rainfall_policy 与 missing_rainfall_policy 分别经用户确认，必需且为 keep 或 exclude；脚本不询问、不补默认选择。
+  - shape_filter 省略项补齐为已声明的推荐值，并写入导出配置与 result 参数；形态过滤只检查事件本体总流量，不检查 warm-up。
+  - 长恒定段历时、历时占比与突跳幅度同时达门槛则整场剔除，任何降雨策略不能绕过，不拆分、不改原始流量。
+  - 雨量时间戳带偏移且符合声明时区；转换为区间末端后与流量同时间步、同网格，不自动重采样。
+  - 雨量筛选只累计事件起点前 lookback_hours 至主洪峰的闭区间内时间戳，不裁掉超出流量范围的前期窗口。
+  - 局部缺测但观测雨量达标可保留且标记；全缺测累计雨量为空而非零，完整窗口全零雨与全缺测分别执行用户选择，少雨与局部缺测未达门槛仍剔除。
+  - rainfall_supported 表示观测雨量是否达门槛，rainfall_accepted 表示降雨策略是否接受；retained 为 rainfall_accepted 且 shape_rejected 为假。
+  - 无降雨支持但按用户策略保留的场次明确标记依据并返回 warning，不被 QC 当作达标雨量。
+  - 剔除事件无正式 event_id、过程或逐场文件；审计表按候选事件时间排序，正式 ID 连续。

@@ -99,6 +99,8 @@ def declared_inputs(manifest_path):
                         paths.append(resolve(reference["path"], path.parent))
         except (ValueError, TypeError, AttributeError):
             pass  # Intake reports the malformed source after destination safety checks.
+    paths.extend(resolve(r["series"]["path"], manifest_path.parent)
+                 for r in manifest.get("runs", []) if "series" in r)
     paths.extend(resolve(p["path"], manifest_path.parent)
                  for p in manifest.get("analysis", {}).get("event_processes", []))
     return paths
@@ -184,6 +186,8 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
     processing = profile in ("data-processing", "timeseries", "spatial")
     if profile not in ("study", "data-processing", "timeseries", "spatial"):
         raise ContractError("Unknown reporting profile")
+    if not processing and manifest.get("schema_version") != "2.0":
+        raise ContractError("Study manifest requires schema_version=2.0; migrate split_periods and runs name/kind/series bindings")
     validate(manifest, ("spatial-processing-manifest.schema.json" if profile == "spatial" else "processing-manifest.schema.json") if processing else "study-manifest.schema.json")
     catalog = read_json(ASSETS / "upstream-catalog.json")
     ids = [s["id"] for s in manifest["sources"]]
@@ -200,7 +204,7 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
         raise ContractError("required_preprocessing must reference declared preprocessing sources")
     owners = {}
     for run in runs:
-        bindings = [(run["simulation"], "simulation")] + [(x, "evaluation") for x in run["evaluations"]]
+        bindings = [(run["simulation"], "postprocessing" if run.get("kind") == "corrected" else "simulation")] + [(x, "evaluation") for x in run["evaluations"]]
         if run.get("calibration"):
             bindings.append((run["calibration"], "calibration"))
         for sid, stage in bindings:
@@ -210,7 +214,7 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
             if stage != "calibration":
                 required.add(sid)
     for sid, source in sources.items():
-        if source["stage"] in ("simulation", "evaluation", "calibration") and sid not in owners:
+        if source["stage"] in ("simulation", "postprocessing", "evaluation", "calibration") and sid not in owners:
             raise ContractError(f"Unbound run source: {sid}")
         if source.get("run_id"):
             if source["run_id"] not in run_ids or sid in owners and owners[sid] != source["run_id"]:
@@ -283,8 +287,8 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
             if source["stage"] == "evaluation":
                 if not {"mode", "split"} <= source.get("context", {}).keys():
                     raise ContractError("Evaluation source requires explicit mode and split context")
-                # A caller-declared scope is clearly distinguished from upstream metadata.
-                warnings.append(f"{sid}: evaluation scope is manifest-declared; semantic review must verify alignment with upstream inputs")
+                # Scope and identity are checked against scored input by the
+                # shared strict validator below, not inferred from labels.
                 ctx = source["context"]
                 if ctx["mode"] == "continuous" and "period" not in ctx:
                     raise ContractError("Continuous evaluation requires an explicit period")
@@ -305,7 +309,7 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
                             start, end = min(times), max(times)
                             add(source, input_path, pointer + "/start", start, "table_metadata")
                             add(source, input_path, pointer + "/end", end, "table_metadata")
-                            if ctx["mode"] == "continuous":
+                            if ctx["mode"] == "continuous" and manifest["schema_version"] != "2.0":
                                 for field, actual in (("start", start), ("end", end)):
                                     if datetime.fromisoformat(ctx["period"][field].replace("Z", "+00:00")) != datetime.fromisoformat(actual.replace("Z", "+00:00")):
                                         raise ContractError(f"Declared evaluation {field} contradicts hashed input")
@@ -409,6 +413,9 @@ def collect_legacy(manifest_path, profile="study", legacy_report=False):
             gaps.append(gap(stage, "warning", "Not provided / 未提供"))
     if any(g["severity"] == "error" for g in gaps):
         raise IntakeError(gaps)
+    if not processing:
+        from _study_validation import validate_study
+        validate_study(manifest, manifest_path)
     report = {"schema_version": "1.0", "study": {"title": manifest["title"], "language": manifest.get("language", "zh")},
             "manifest": ref(manifest_path), "runs": runs, "sources": snapshots,
             "evidence": evidence, "figures": figures, "gaps": gaps, "warnings": warnings,

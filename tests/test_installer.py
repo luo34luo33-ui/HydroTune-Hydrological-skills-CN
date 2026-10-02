@@ -49,7 +49,7 @@ def test_default_dry_run_lists_skills_and_workflows_without_writes(
     assert result.stdout.count("将安装: hydro-visualization-reporting-") == 8
     assert result.stdout.count("将安装: hydro-model-calibration-") == 5
     assert result.stdout.count("将安装: hydro-hydrological-modeling-") == 11
-    assert result.stdout.count("将安装: hydro-post-processing-") == 2
+    assert result.stdout.count("将安装: hydro-post-processing-") == 3
     assert result.stdout.count("将安装: hydro-evaluation-diagnostics-") == 3
     assert not target.exists()
 
@@ -152,6 +152,14 @@ def test_model_calibration_category_installs_five_self_contained_skills(
         if skill_dir.is_dir():
             assert (skill_dir / "scripts" / "_calibration_common.py").is_file()
             assert any((skill_dir / "scripts").glob("calibrate_model_*.py"))
+            source_dir = repo_root / "model-calibration" / skill_dir.name.removeprefix("hydro-model-calibration-")
+            for source_file, installed_file in [
+                (source_dir / "SKILL.md", skill_dir / "SKILL.md"),
+                (source_dir / "usage-guide.md", skill_dir / "references" / "usage-guide.md"),
+            ]:
+                source_text = source_file.read_text(encoding="utf-8")
+                confirmation = "## 率定前确认" + source_text.split("## 率定前确认", 1)[1].split("\n## ", 1)[0]
+                assert confirmation.strip() in installed_file.read_text(encoding="utf-8")
 
 
 def test_visualization_category_installs_eight_self_contained_skills(
@@ -230,7 +238,7 @@ def test_install_rewrites_layout_name_and_links(
     assert (skill_dir / "references" / "usage-guide.md").is_file()
     assert (skill_dir / "references" / "workflow.yaml").is_file()
     manifest = json.loads((target / ".hydrotune-skills-manifest.json").read_text(encoding="utf-8"))
-    assert len(manifest["installed"]) == 43
+    assert len(manifest["installed"]) == 44
 
 
 def test_update_uses_content_hash(
@@ -252,7 +260,7 @@ def test_update_uses_content_hash(
         "hydro-workflow-data-preprocessing"
     ]["sha256"]
     assert after != before
-    assert "跳过 42 个" in update.stdout
+    assert "跳过 43 个" in update.stdout
 
 
 def test_update_retires_managed_old_report_with_recoverable_archive(repo_root, tmp_path, utf8_env):

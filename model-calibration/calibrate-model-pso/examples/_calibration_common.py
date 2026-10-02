@@ -297,6 +297,25 @@ def materialize(evaluator: Any, params: dict[str, float], split: str, problem: d
     return {"objective": objective, "metrics": metrics}, series.copy()
 
 
+def validate_split_isolation(calibration, validation, data_shape):
+    a = calibration.loc[calibration['scored']]
+    b = validation.loc[validation['scored']]
+    if data_shape == 'event_collection':
+        overlap = set(a['event_id'].astype(str)) & set(b['event_id'].astype(str))
+    else:
+        def timestamps(frame):
+            values = [pd.Timestamp(value) for value in frame['time']]
+            if any(pd.isna(t) or t.tzinfo is None for t in values):
+                raise ScientificQCError('scored timestamps require explicit timezone')
+            values = [t.tz_convert('UTC') for t in values]
+            if len(set(values)) != len(values):
+                raise ScientificQCError('duplicate scored timestamps')
+            return set(values)
+        overlap = timestamps(a) & timestamps(b)
+    if overlap:
+        raise ScientificQCError(f'calibration/validation scored samples overlap: {sorted(map(str, overlap))[:10]}')
+
+
 def _write_trace(path: Path, rows: list[dict[str, Any]]) -> None:
     if not rows:
         raise ScientificQCError("calibration trace is empty")
@@ -333,6 +352,7 @@ def execute_calibration(algorithm: str, skill_ref: str, problem_path: Path, conf
     best_params = {name: float(value) for name, value in zip(names, context.best_x)}
     calibration_metrics, calibration_series = materialize(evaluator, best_params, "calibration", problem, context.best_objective)
     validation_metrics, validation_series = materialize(evaluator, best_params, "validation", problem)
+    validate_split_isolation(calibration_series, validation_series, problem["data_shape"])
     best_document = {
         "schema_version": "1.0", "algorithm": algorithm,
         "parameters": {

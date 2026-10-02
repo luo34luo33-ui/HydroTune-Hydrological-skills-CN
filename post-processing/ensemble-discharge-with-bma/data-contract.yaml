@@ -1,0 +1,101 @@
+schema_version: "1.0"
+skill: post-processing/ensemble-discharge-with-bma
+inputs:
+  - id: member_manifest
+    description: JSON 成员清单，声明唯一模型 ID、相同流域出口、m3/s、步长、时区以及模型 result 或逐场次清单和路由出口声明。
+    required: true
+    format: JSON
+    variables:
+      - name: simulated_m3_s
+        semantics: 已有水文模型或路由成果中的流域出口流量；至少两个固定成员。
+        units: m3/s
+        time_step: 由 timestep_hours 声明，并与每成员时间轴验证一致。
+        timezone: 时间必须携带时区；声明时区保存在集合器中，计算与输出统一 UTC。
+        calendar: proleptic Gregorian
+        spatial_unit: 明确且相同的流域出口 outlet_id，由调用方确认。
+        catchment_area: 继承上游；本 skill 不做面积换算。
+        coordinate_reference_system: not_applicable
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 缺失、负值、非有限值、轴不一致时停止，不插值、填零或重分配权重。
+  - id: observed_result
+    description: train 必填的标准观测 result.json，核验 discharge_timeseries 的 SHA-256，完整覆盖训练有效时步。
+    required: false
+    format: JSON and CSV/Parquet/XLSX
+    variables:
+      - name: discharge_m3_s
+        semantics: 历史流域出口观测，仅 train 读取；全零或恒定时停止。
+        units: m3/s
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 所选训练时步缺测或非有限值停止。
+  - id: trained_model_result
+    description: predict 必填的本 skill 训练 result.json，含可核验哈希的 bma_model.json。
+    required: false
+    format: JSON
+  - id: selection_and_fit_parameters
+    description: 连续模式显式带时区 start/end，场次模式显式完整 event ID 清单；train 显式随机种子，初始化/迭代/容差默认 5/500/1e-8。
+    required: true
+    format: CLI arguments
+outputs:
+  - id: model
+    description: train 成功时的 bma_model.json，含固定成员、归一化偏差/尺度/权重、缩放、训练范围及出口步长时区语义。
+    required: false
+    format: JSON
+  - id: model_card
+    description: 训练样本数、输入证据、参数量纲、科学假设和警告。
+    required: false
+    format: JSON
+  - id: fit_diagnostics
+    description: train 每次初始化的收敛原因、迭代数及归一化平均对数似然历史；未收敛仍保留。
+    required: false
+    format: JSON
+  - id: ensemble
+    description: predict 的 ensemble_discharge.csv，含 time、可选 event_id、集合均值、配置的分位数及零流量概率。
+    required: false
+    format: CSV
+    variables:
+      - name: ensemble_mean_m3_s
+        semantics: 零点删失高斯混合分布的解析期望，而非原模拟加权平均。
+        units: m3/s
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 概率计算失败不发布表，不写 NaN。
+      - name: p05_m3_s,p50_m3_s,p95_m3_s
+        semantics: 默认混合 CDF 分位数；5% 至 95% 为 90% 等尾预测区间，零点概率内的分位数等于零。
+        units: m3/s
+        state_or_flux: flux
+        accumulated_or_instantaneous: instantaneous
+        missing_value_semantics: 失败不发布表；自定义概率改变列名。
+      - name: probability_zero
+        semantics: 混合分布在零流量处的概率质量。
+        units: fraction
+        state_or_flux: not_applicable
+        accumulated_or_instantaneous: not_applicable
+        missing_value_semantics: 失败不发布表。
+  - id: components
+    description: predict 的长表，按时间键及模型 ID 保存原始模拟、潜在中心、标准差、权重、零概率，可重建边际分布。
+    required: false
+    format: CSV
+  - id: qc
+    description: 精确匹配、有效行数、预热并集、成员数及连续/场次模式。
+    required: true
+    format: JSON
+  - id: result
+    description: 运行状态、参数、输入和产物 SHA-256、QC、警告及 Python/NumPy/Pandas/SciPy 版本；失败只引用已有诊断。
+    required: true
+    format: JSON
+warmup_period:
+  required: true
+  semantics: 使用上游明确预热证据，剔除任一成员预热行并集；所选场次无有效行时停止。
+simulation_period:
+  required: true
+  semantics: 连续期含 start/end 两端；场次使用完整场次。预测有效时步全部晚于训练结束，不复用训练 event ID。
+invariants:
+  - 至少两个非负有限出口成员；单位 m3/s，出口、时间步长、时区、时序模式与训练一致。
+  - 精确时间键对齐，不重采样、取覆盖交集、移动洪峰或填补失败成员。
+  - 权重非负且和为一，斜率非负，归一化 sigma 不小于数值下限 1e-6。
+  - 零观测使用零点概率质量，正观测使用密度；predict 不读取观测或更新权重。
+  - 均值非负、分位数单调非负、概率在零至一之间；只定义逐时步边际分布。
+  - 无收敛初始化不发布集合器；任何失败不发布可用预测表。
+  - 源成果只读，输出限定在 output-dir，默认拒绝非空目录。

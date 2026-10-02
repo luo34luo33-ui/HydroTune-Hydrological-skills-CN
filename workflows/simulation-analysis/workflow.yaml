@@ -17,6 +17,8 @@ stages:
       checks:
         - 观测与模拟的时间、单位和空间含义一致
         - warm-up 和无效期间已从评价范围排除
+        - 率定与验证时段有显式时区且互不重叠，事件按完整评分区间归属
+        - 基准与校正使用独立运行身份，评价模拟列按时间绑定原始序列
   - id: baseline_performance
     type: abstract
     description: 计算基础性能、水量平衡和必要的基准比较。
@@ -32,6 +34,7 @@ stages:
       checks:
         - 指标定义、方向和评价样本数明确
         - 指标未脱离适用场景单独解释
+        - 基准与校正的直接对比使用相同观测、评分时间与事件集合
   - id: temporal_event_regime_diagnostics
     type: abstract
     description: 诊断时序、洪水事件、高中低流量和季节性误差模式。

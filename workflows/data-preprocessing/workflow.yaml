@@ -34,7 +34,7 @@ stages:
         - 缺测和异常处理未跨越独立事件边界
   - id: flood_event_identification
     type: abstract
-    description: 识别降雨和洪水事件、边界、峰值与前期状态证据。
+    description: 识别洪水事件、边界和峰值，剔除突跳长直线过程，按显式降雨参数与用户确认策略筛选并保留证据。
     depends_on:
       - temporal_quality_control
     inputs:
@@ -42,11 +42,16 @@ stages:
     outputs:
       - event_collection
       - event_attributes
+      - rainfall_screening_evidence
     qc:
       required: true
       checks:
         - 每个事件保留唯一标识和起止边界
         - 识别阈值和方法来源可追溯
+        - 新任务分别取得无降水与雨量全缺失的保留选择，已有明确选择不重复询问，策略写入配置与结果
+        - 突跳长直线过程整场剔除，不拆分、不修改原始流量，降雨与用户保留策略均不能绕过
+        - 零雨与缺测区分，局部缺测但观测雨量达标可保留并标记，少雨或局部缺测未达门槛仍剔除
+        - 策略保留的无雨或全缺测事件标记无降雨支持，不推断成因或完整 forcing 就绪
   - id: spatial_preprocessing
     type: abstract
     description: 在目标需要时整理 DEM、边界、出口、站点、河网和子流域。

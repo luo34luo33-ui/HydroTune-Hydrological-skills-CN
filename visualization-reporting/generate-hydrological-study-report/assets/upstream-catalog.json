@@ -1322,5 +1322,9 @@
   "visualization-reporting/visualize-model-calibration": {
     "stage": "atlas",
     "variables": {}
+  },
+  "post-processing/correct-residual-with-ml": {
+    "stage": "postprocessing",
+    "variables": {}
   }
 }

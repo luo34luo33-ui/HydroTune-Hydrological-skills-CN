@@ -64,6 +64,11 @@ ml = [
 ml-xgboost = [
   "xgboost>=2,<3",
 ]
+bma = [
+  "numpy>=1.24,<3",
+  "pandas>=2,<3",
+  "scipy>=1.11,<2",
+]
 
 [tool.setuptools]
 py-modules = []

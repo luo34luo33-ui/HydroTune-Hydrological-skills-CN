@@ -42,15 +42,18 @@ def _figure(style, text, frame):
 
 
 def _rainfall(axis, rain, step, style, text, overview=False):
-    if rain is None:
+    if rain is None or rain.empty or not rain["P_mm"].notna().any():
         return None, []
     display = rain.copy()
     group_size = max(1, int(np.ceil(len(display) / 1800))) if overview else 1
     if group_size > 1:
         groups = np.arange(len(display)) // group_size
-        display = display.groupby(groups, sort=True).agg(time=("time", "last"), P_mm=("P_mm", "sum"), steps=("P_mm", "size"))
+        display = display.groupby(groups, sort=True).agg(time=("time", "last"),
+                    P_mm=("P_mm", lambda values: values.sum(min_count=1)), steps=("P_mm", "size"))
     else:
         display["steps"] = 1
+    # A missing step/bin has no bar; a recorded zero remains a valid zero-height bar.
+    display = display[display["P_mm"].notna()].copy()
     rain_axis = axis.twinx()
     rain_axis.set_zorder(0)
     axis.set_zorder(2)
@@ -67,7 +70,7 @@ def _rainfall(axis, rain, step, style, text, overview=False):
     rain_axis.spines["right"].set_color("black")
     rain_axis.spines["right"].set_linewidth(1)
     axis.set_xlim(rain["time"].iloc[0] - pd.Timedelta(seconds=step), rain["time"].iloc[-1])
-    note = f"basin mean depth mm/step; interval_end; step_seconds={step}; display bars sum {group_size} consecutive steps (last bin may be shorter); no interpolation"
+    note = f"basin mean depth mm/step; interval_end; step_seconds={step}; display bars sum observed values in {group_size} consecutive steps (last bin may be shorter); missing_steps={int(rain['P_mm'].isna().sum())}; missing bars/bins omitted; partial bins show observed subtotal; no zero filling or interpolation"
     return Patch(facecolor=style["colors"]["rainfall"], alpha=style["layout"]["rainfall_alpha"], label=text["rainfall"]), [
         {"id": "basin-rainfall", "source": "rainfall", "display_transform": note, "palette": "light-blue"}]
 

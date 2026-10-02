@@ -21,29 +21,29 @@ inputs:
         accumulated_or_instantaneous: instantaneous
         missing_value_semantics: 缺测默认停止；使用 drop-rows 时必须记录丢弃行数。
       - name: residual
-        semantics: 由本 Skill 计算的残差，定义为 observed - base；不作为输入接受相反符号约定。
+        semantics: 有观测时由本 Skill 计算 observed - base；predict 无观测时必须提供由已可用历史观测与基准模拟得到的同定义历史残差列。仅其 t-1 至 t-5 等历史滞后可作为输入，当前残差是预测目标。
         units: m3/s
         time_step: 与输入一致
         state_or_flux: flux
         accumulated_or_instantaneous: instantaneous
-        missing_value_semantics: 由构造过程产生，不得手工替换。
+        missing_value_semantics: 缺少历史残差来源时停止，不自动以预测残差替代；不接受相反符号约定。
   - id: model_configuration
     description: 后端名称、显式超参、随机种子、划分方式与滞后特征配置。
     required: true
     format: CLI arguments and JSON
     variables:
       - name: feature_columns
-        semantics: 参与训练与预测的特征列清单，必须显式列出，不自动推断。
+        semantics: 原始特征列清单，训练必须显式列出，预测沿用模型卡；与必需残差滞后特征一起输入模型，不得包含当前 residual。
         units: column names
         state_or_flux: not_applicable
         accumulated_or_instantaneous: not_applicable
         missing_value_semantics: 缺失列必须停止。
       - name: lag_spec
-        semantics: 滞后特征定义，步数必须为非负整数，禁止使用未来时刻的值。
+        semantics: 训练必须显式声明 residual:1,2,3,4,5，预测沿用并校验模型卡；生成 residual_lag_1 至 residual_lag_5。步数为输入序列时间步，其他变量步数非负；禁止 residual:0 和未来信息。
         units: steps
         state_or_flux: not_applicable
         accumulated_or_instantaneous: not_applicable
-        missing_value_semantics: 负步数必须停止。
+        missing_value_semantics: 缺少任一必需残差滞后、使用当前残差或负步数必须停止；旧模型卡不满足要求时提示重新训练。
 outputs:
   - id: corrected_series
     description: 含基准列、观测列（若有）、残差、预测残差与校正列的逐时步表。
@@ -81,6 +81,8 @@ simulation_period:
   semantics: 输入表覆盖的全部时步；滞后构造或缺测处理会减少可用行，减少数量必须写入 result.json。
 invariants:
   - 残差定义必须为 observed - base，回代必须为 base + predicted_residual。
+  - 输入特征必须包含 residual(t-1) 至 residual(t-5)，不得输入当前 residual 或 residual:0；其他合法特征可继续使用。
+  - 预测历史残差必须来自已可用的历史观测与基准模拟，缺少来源时停止，不自动用预测残差替代。
   - 滞后步数必须为非负整数，禁止引入未来信息。
   - 训练必须给出 random_state，否则拒绝执行。
   - 输入缺测默认停止；滞后构造造成的不完整行只能丢弃或显式填充，不得静默填 0。

@@ -71,7 +71,7 @@ def test_residual_correction_train_then_predict_roundtrip(
     trained = _run(
         repo_root, "ml", "--mode", "train", "--table", table,
         "--base-column", "Q_total", "--observed-column", "Q_obs", "--feature-columns", "P,Qt",
-        "--lag-spec", "residual:1,2,3", "--backend", backend,
+        "--lag-spec", "residual:1,2,3,4,5", "--lag-spec", "P:0,1", "--backend", backend,
         "--hyperparameters", hyperparameters, "--random-state", "2025",
         "--split", "chronological", "--output-dir", train_dir,
     )
@@ -84,7 +84,11 @@ def test_residual_correction_train_then_predict_roundtrip(
     assert card["residual_definition"] == "observed - base"
     assert card["random_state"] == 2025
     assert card["feature_columns"] == ["P", "Qt"]
-    assert card["lag_spec"] == [{"column": "residual", "steps": [1, 2, 3]}]
+    assert card["lag_spec"] == [
+        {"column": "residual", "steps": [1, 2, 3, 4, 5]},
+        {"column": "P", "steps": [0, 1]},
+    ]
+    assert train_document["parameters"]["lag_spec"] == card["lag_spec"]
     assert card["train_rows"] > 0
 
     produced = pd.read_csv(train_dir / "corrected_series.csv")
@@ -100,16 +104,29 @@ def test_residual_correction_train_then_predict_roundtrip(
         rtol=1e-9,
         atol=1e-9,
     )
-    assert int(produced["residual_lag_1"].isna().sum()) == 0
+    original = _training_frame()
+    original_residual = original["Q_obs"] - original["Q_total"]
+    assert len(produced) == len(original) - 5
+    for step in range(1, 6):
+        np.testing.assert_allclose(
+            produced[f"residual_lag_{step}"], original_residual.shift(step).iloc[5:],
+        )
+    np.testing.assert_allclose(produced["P_lag_0"], original["P"].iloc[5:])
+    np.testing.assert_allclose(produced["P_lag_1"], original["P"].shift(1).iloc[5:])
 
     predict_dir = root / "02 预测（结果）"
+    history_table = root / "history.csv"
+    history = original.drop(columns="Q_obs")
+    history["residual"] = original_residual
+    history.to_csv(history_table, index=False)
     predicted = _run(
-        repo_root, "ml", "--mode", "predict", "--table", train_dir / "corrected_series.csv",
+        repo_root, "ml", "--mode", "predict", "--table", history_table,
         "--base-column", "Q_total", "--model-in", train_dir / "model.joblib",
         "--output-dir", predict_dir,
     )
     assert predicted.returncode == 0, predicted.stderr
     applied = pd.read_csv(predict_dir / "corrected_series.csv")
+    np.testing.assert_allclose(applied["predicted_residual"], produced["predicted_residual"])
     np.testing.assert_allclose(
         applied["corrected"].to_numpy(dtype=float),
         (applied["Q_total"] + applied["predicted_residual"]).to_numpy(dtype=float),
@@ -128,6 +145,7 @@ def test_residual_correction_rejects_missing_random_state(repo_root: Path, tmp_p
     completed = _run(
         repo_root, "ml", "--mode", "train", "--table", table,
         "--base-column", "Q_total", "--observed-column", "Q_obs", "--feature-columns", "P,Qt",
+        "--lag-spec", "residual:1,2,3,4,5",
         "--backend", "ridge", "--hyperparameters", "{}", "--output-dir", output,
     )
     assert completed.returncode == 1, completed.stdout
@@ -138,7 +156,7 @@ def test_residual_correction_rejects_missing_random_state(repo_root: Path, tmp_p
     "case,arguments",
     [
         ("future-lag", ["--lag-spec", "residual:-1"]),
-        ("missing-feature", ["--feature-columns", "missing_column"]),
+        ("missing-feature", ["--feature-columns", "missing_column", "--lag-spec", "residual:1,2,3,4,5"]),
     ],
 )
 def test_residual_correction_rejects_future_information_and_missing_features(
@@ -188,6 +206,7 @@ def test_residual_correction_xgboost_backend_when_available(repo_root: Path, tmp
     completed = _run(
         repo_root, "ml", "--mode", "train", "--table", table,
         "--base-column", "Q_total", "--observed-column", "Q_obs", "--feature-columns", "P,Qt",
+        "--lag-spec", "residual:1,2,3,4,5",
         "--backend", "xgboost",
         "--hyperparameters", repo_root / "post-processing/correct-residual-with-ml/examples/source_equivalent_hyperparameters.json",
         "--random-state", "7", "--output-dir", output,
@@ -197,3 +216,74 @@ def test_residual_correction_xgboost_backend_when_available(repo_root: Path, tmp
     assert card["backend"] == "xgboost"
     assert card["hyperparameters"]["n_estimators"] == 500
     assert "_note" not in card["hyperparameters"]
+
+
+@pytest.mark.parametrize("missing_step", [None, 1, 2, 3, 4, 5])
+def test_residual_correction_requires_all_five_lags(repo_root: Path, tmp_path: Path, missing_step: int | None) -> None:
+    table = tmp_path / "table.csv"
+    _training_frame(120).to_csv(table, index=False)
+    output = tmp_path / "out"
+    arguments = [] if missing_step is None else [
+        "--lag-spec", "residual:" + ",".join(str(step) for step in range(1, 6) if step != missing_step),
+    ]
+    completed = _run(
+        repo_root, "ml", "--mode", "train", "--table", table,
+        "--feature-columns", "P,Qt", "--backend", "ridge", "--hyperparameters", "{}",
+        "--random-state", "3", *arguments, "--output-dir", output,
+    )
+    assert completed.returncode == 1
+    expected = [1, 2, 3, 4, 5] if missing_step is None else [missing_step]
+    assert f"缺少残差滞后步数: {expected}" in completed.stderr
+    assert not (output / "model.joblib").exists()
+    assert not (output / "corrected_series.csv").exists()
+
+
+@pytest.mark.parametrize("features,lag", [
+    ("P,Qt,residual", "residual:1,2,3,4,5"),
+    ("P,Qt", "residual:0,1,2,3,4,5"),
+])
+def test_residual_correction_rejects_current_residual(repo_root: Path, tmp_path: Path, features: str, lag: str) -> None:
+    table = tmp_path / "table.csv"
+    _training_frame(120).to_csv(table, index=False)
+    completed = _run(
+        repo_root, "ml", "--mode", "train", "--table", table,
+        "--feature-columns", features, "--lag-spec", lag,
+        "--backend", "ridge", "--hyperparameters", "{}", "--random-state", "3",
+        "--output-dir", tmp_path / "out",
+    )
+    assert completed.returncode == 1
+    assert "当前" in completed.stderr
+
+
+@pytest.mark.parametrize("case", ["old-card", "current-feature", "current-lag", "missing-history"])
+def test_residual_prediction_rejects_invalid_card_or_missing_history(repo_root: Path, tmp_path: Path, case: str) -> None:
+    table = tmp_path / "table.csv"
+    frame = _training_frame(120)
+    frame.to_csv(table, index=False)
+    train_dir = tmp_path / "train"
+    trained = _run(
+        repo_root, "ml", "--mode", "train", "--table", table,
+        "--feature-columns", "P,Qt", "--lag-spec", "residual:1,2,3,4,5",
+        "--backend", "ridge", "--hyperparameters", "{}", "--random-state", "3",
+        "--output-dir", train_dir,
+    )
+    assert trained.returncode == 0, trained.stderr
+    card_path = train_dir / "model_card.json"
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    if case == "old-card":
+        card["lag_spec"][0]["steps"] = [1, 2, 3]
+    elif case == "current-feature":
+        card["feature_columns"].append("residual")
+    elif case == "current-lag":
+        card["lag_spec"][0]["steps"].append(0)
+    else:
+        frame.drop(columns="Q_obs").to_csv(table, index=False)
+    card_path.write_text(json.dumps(card), encoding="utf-8")
+    output = tmp_path / "predict"
+    predicted = _run(
+        repo_root, "ml", "--mode", "predict", "--table", table,
+        "--model-in", train_dir / "model.joblib", "--output-dir", output,
+    )
+    assert predicted.returncode == 1
+    assert ("历史残差来源" if case == "missing-history" else "重新训练") in predicted.stderr
+    assert not (output / "corrected_series.csv").exists()

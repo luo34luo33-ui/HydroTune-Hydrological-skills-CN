@@ -2,7 +2,7 @@
 
 HydroTune-skills 是一个面向水文模拟 AI Coding Agent 的可复用 Agent Skills 仓库。它把水文专家的决策边界、数据约束、质量控制、失败模式和结果解释组织为可发现、可安装、可校验的 Atomic Skills 与 Workflows。
 
-当前版本包含四十个 Atomic Skill：五个 `data-processing`、六个 `spatial-analysis`、十一个 `hydrological-modeling`、两个 `post-processing`、三个 `evaluation-diagnostics`、五个 `model-calibration` 和八个 `visualization-reporting` Skill。率定覆盖 DE、GA、PSO、SCE-UA 和模拟退火—L-BFGS-B 两阶段算法，并由统一固定图册展示率定与验证证据。建模链提供集总式与半分布式新安江、基于显式 HRU 表的半分布式 SWAT、马斯京根与 Lohmann 两种河道演算、集总式大伙房（DHF）、集总式 HBV、集总式 Tank、集总式 GR4J、集总式 SAC-SMA 与地形输入驱动的集总式 TOPMODEL 十一个模型 Skill，后处理提供机器学习残差校正与出口流量对齐。三个 workflow、跨平台安装器、schema 和验证体系保持有效。
+当前版本包含四十一个 Atomic Skill：五个 `data-processing`、六个 `spatial-analysis`、十一个 `hydrological-modeling`、三个 `post-processing`、三个 `evaluation-diagnostics`、五个 `model-calibration` 和八个 `visualization-reporting` Skill。率定覆盖 DE、GA、PSO、SCE-UA 和模拟退火—L-BFGS-B 两阶段算法，并由统一固定图册展示率定与验证证据。建模链提供集总式与半分布式新安江、基于显式 HRU 表的半分布式 SWAT、马斯京根与 Lohmann 两种河道演算、集总式大伙房（DHF）、集总式 HBV、集总式 Tank、集总式 GR4J、集总式 SAC-SMA 与地形输入驱动的集总式 TOPMODEL 十一个模型 Skill，后处理提供机器学习残差校正、出口流量对齐与概率 BMA 集合预报。三个 workflow、跨平台安装器、schema 和验证体系保持有效。
 
 ## 设计来源
 
@@ -82,6 +82,10 @@ prepare-dem-analysis-grid
 
 这些 Skill 已存在，但 `data-preprocessing` workflow 仍有意保持抽象 stage，以免把所有空间预处理任务固定为单一 DEM 路线。
 
+## 概率 BMA 集合预报 Skill
+
+`post-processing/ensemble-discharge-with-bma` 消费多个已运行模型的真实出口流量，以历史观测训练零点删失高斯混合分布，再应用到未来连续期或完整洪水场次。输出非负集合均值、分位数、零流量概率、成员分布及拟合证据；使用混合似然而非 NSE-softmax，不重跑成员模型。训练与应用分离，应用阶段不需要观测；缺成员、时间轴不一致或时段重叠停止。环境依赖使用 `pip install -e ".[bma]"`，完整示例见[概率 BMA 使用指南](post-processing/ensemble-discharge-with-bma/usage-guide.md)。
+
 ## 水文研究报告 Skills
 
 - `generate-timeseries-data-processing-report`：汇总时序资料、洪水规模与显著单峰/多峰比例；参数显式提供，无需模拟或评价。
@@ -125,6 +129,8 @@ prepare-discharge-timeseries
 事件示例配置用于复现参考源码，不是通用默认值。洪水图册 v2 输出 `2400×1200 px` PNG、SVG 和 `figure.json`，采用白底论文版式、图内三项指标摘要、黑灰过程线及红色洪峰；可显式叠加已确认流域平均雨量的倒置柱状图，中文宋体、英文 Times New Roman。
 
 ## 模型率定与效果图册 Skills
+
+五种率定 Skill 执行前必须由用户明确选择 `continuous` 或 `event_collection`，不能用配置值或 Agent 推断代替确认。同一任务、同一批数据且组织模式不变时确认可复用；更换数据或改变组织模式时重新确认。未确认或与 `problem.data_shape` 的冲突未解决时，不启动搜索或调用率定评估器。该规则约束使用 Skill 的 Agent，现有 CLI 保持兼容。
 
 ```text
 calibrate-model-{de|ga|pso|sce-ua|two-stage}
@@ -257,7 +263,7 @@ Claude Code 使用 `install-claude.sh`/`.ps1`，OpenCode 使用 `install-opencod
 
 全量安装默认包含 Atomic Skills 和 workflows；一旦使用 `--categories`，workflow 必须通过 `--workflows` 显式选择。更新使用渲染后内容的 SHA-256；卸载只删除安装清单记录的目录。
 
-默认安装和 dry-run 包含四十个 Atomic Skill 与三个 workflow。使用 `--categories data-processing` 时安装五个时序、蒸散与事件 Skill；`spatial-analysis` 安装六个空间分析 Skill（含 TOPMODEL 地形输入与 forcing 面积聚合）；`hydrological-modeling` 安装十一个模型 Skill（集总式与半分布式新安江、半分布式 SWAT、马斯京根、Lohmann、大伙房、HBV、Tank、GR4J、SAC-SMA、TOPMODEL）；`post-processing` 安装两个模拟后处理 Skill；`evaluation-diagnostics` 安装三个指标与汇总 Skill；`model-calibration` 安装五个率定 Skill；`visualization-reporting` 安装四个固定图册、三个报告生成 Skill 和一个独立审查 Skill。尚无 Skill 的 category 仍会明确报告“当前无可安装 Atomic Skill”。
+默认安装和 dry-run 包含四十一个 Atomic Skill 与三个 workflow。使用 `--categories data-processing` 时安装五个时序、蒸散与事件 Skill；`spatial-analysis` 安装六个空间分析 Skill（含 TOPMODEL 地形输入与 forcing 面积聚合）；`hydrological-modeling` 安装十一个模型 Skill（集总式与半分布式新安江、半分布式 SWAT、马斯京根、Lohmann、大伙房、HBV、Tank、GR4J、SAC-SMA、TOPMODEL）；`post-processing` 安装三个模拟后处理 Skill；`evaluation-diagnostics` 安装三个指标与汇总 Skill；`model-calibration` 安装五个率定 Skill；`visualization-reporting` 安装四个固定图册、三个报告生成 Skill 和一个独立审查 Skill。尚无 Skill 的 category 仍会明确报告“当前无可安装 Atomic Skill”。
 
 ## 校验与测试
 
@@ -269,7 +275,7 @@ python -m pytest
 python -m pytest -m integration
 ```
 
-当前仓库基线为“40 个 Atomic Skill + 3 个 Workflow”。校验器会拒绝无效 frontmatter、错误目录层级、未注册 category、失效引用、无效数据契约、重复或循环 stage 以及未完成占位内容。
+当前仓库基线为“41 个 Atomic Skill + 3 个 Workflow”。校验器会拒绝无效 frontmatter、错误目录层级、未注册 category、失效引用、无效数据契约、重复或循环 stage 以及未完成占位内容。
 
 ## 当前边界
 

@@ -56,7 +56,9 @@ def main(argv=None):
         status = "warning" if report["gaps"] or report["warnings"] or args.command == "prepare" else "success"
         result(out, SKILL, status, "Evidence draft prepared; Agent prose required" if args.command == "prepare"
                else "Report rendered; independent semantic review required", report["warnings"],
-               [{"check": "source_integrity", "status": "PASS", "details": "Original sources verified"}])
+               [{"check": "source_integrity", "status": "PASS", "details": "Original sources verified"},
+                {"check": "evaluation_scope", "status": "PASS", "details": "Timezone-aware scored periods and complete event scopes verified"},
+                {"check": "run_series_identity", "status": "PASS", "details": "Evaluation values bound to original run series; declared comparisons use identical samples"}])
         print(status)
         return 0
     except Exception as exc:

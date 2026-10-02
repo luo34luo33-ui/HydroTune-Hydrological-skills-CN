@@ -38,6 +38,7 @@ DECLARED = [
     "result.json",
 ]
 RESIDUAL_DEFINITION = "observed - base"
+REQUIRED_RESIDUAL_LAGS = {1, 2, 3, 4, 5}
 
 
 class QualityControlFailure(RuntimeError):
@@ -92,6 +93,25 @@ def parse_hyperparameters(raw: str) -> dict[str, Any]:
         raise ContractError("--hyperparameters 必须是 object")
     # 下划线开头的键只作为文件内说明，不传给估计器。
     return {key: value for key, value in document.items() if not key.startswith("_")}
+
+
+def validate_residual_features(
+    feature_columns: list[str], lag_specs: list[tuple[str, list[int]]],
+    *, from_model_card: bool = False,
+) -> None:
+    suffix = "；请使用完整残差滞后配置重新训练模型" if from_model_card else ""
+    if "residual" in feature_columns:
+        raise ContractError("禁止将当前时刻 residual 作为输入特征" + suffix)
+    residual_steps = {step for column, steps in lag_specs if column == "residual" for step in steps}
+    if 0 in residual_steps:
+        raise ContractError("禁止使用 residual:0，当前残差是预测目标" + suffix)
+    if any(step < 0 for _, steps in lag_specs for step in steps):
+        raise ContractError("滞后步数必须为非负整数，禁止使用未来信息" + suffix)
+    missing = sorted(REQUIRED_RESIDUAL_LAGS - residual_steps)
+    if missing:
+        raise ContractError(
+            f"必须包含 residual(t-1) 至 residual(t-5)，缺少残差滞后步数: {missing}" + suffix
+        )
 
 
 def _lag_column_name(column: str, step: int) -> str:
@@ -186,6 +206,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         feature_columns = [item.strip() for item in args.feature_columns.split(",") if item.strip()]
         if not feature_columns:
             raise ContractError("train 模式必须给出 --feature-columns")
+        validate_residual_features(feature_columns, lag_specs)
         require_columns(frame, feature_columns, "输入表")
         model_card = {
             "skill": SKILL_REF,
@@ -210,10 +231,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         if lag_specs and sorted(lag_specs) != sorted(card_lag):
             raise ContractError("--lag-spec 与模型卡记录不一致；predict 模式应沿用训练时的滞后配置")
         lag_specs = card_lag
+        validate_residual_features(feature_columns, lag_specs, from_model_card=True)
         require_columns(frame, [args.time_column, args.base_column], "输入表")
         require_columns(frame, feature_columns, "输入表")
 
     checks.append(check("residual_definition", "PASS", f"残差定义为 {RESIDUAL_DEFINITION}"))
+    checks.append(check("required_residual_lags", "PASS", "包含 residual(t-1) 至 residual(t-5)，不使用当前残差"))
     checks.append(check(
         "lag_nonnegative", "PASS",
         f"滞后步数均为非负整数，共 {sum(len(steps) for _, steps in lag_specs)} 个滞后特征，不使用未来信息",
@@ -230,6 +253,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         working["residual"] = (
             pd.to_numeric(working[args.observed_column], errors="coerce")
             - pd.to_numeric(working[args.base_column], errors="coerce")
+        )
+    elif "residual" not in working.columns:
+        raise ContractError(
+            "预测需要历史残差来源：提供观测与基准列，或提供由历史 observed - base 得到的 residual 列；"
+            "不会自动用预测残差替代历史残差"
         )
 
     working, used_columns, dropped = build_features(
@@ -432,7 +460,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-column", default="Q_total")
     parser.add_argument("--observed-column", default="Q_obs")
     parser.add_argument("--feature-columns", help="逗号分隔的原始特征列")
-    parser.add_argument("--lag-spec", action="append", help="COLUMN:STEPS，可重复；STEPS 为非负整数")
+    parser.add_argument("--lag-spec", action="append", help="COLUMN:STEPS，可重复；train 必须包含 residual:1,2,3,4,5，禁止 residual:0")
     parser.add_argument("--lag-policy", choices=("drop", "fill", "fail"), default="drop")
     parser.add_argument("--lag-fill-value", type=float)
     parser.add_argument("--backend", choices=BACKENDS, help="train 模式必填；predict 模式缺省时取模型卡记录")

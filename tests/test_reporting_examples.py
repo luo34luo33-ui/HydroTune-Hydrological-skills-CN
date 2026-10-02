@@ -40,19 +40,37 @@ def source(tmp, sid, skill, artifacts, parameters=None):
     return path
 
 
+def series_binding(path, column='Q'):
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "time_column": "time", "simulated_column": column, "unit": "m3/s"}
+
+
+def evaluation_input(result_path, content):
+    path = result_path.parent / 'scored-input.csv'
+    path.write_text(content, encoding='utf-8')
+    doc = read(result_path)
+    doc['inputs']['series'] = {"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    write(result_path, doc)
+
+
+SPLIT_PERIODS = {"calibration": {"start": "2019-01-01T00:00:00Z", "end": "2019-12-31T23:59:59Z"},
+                 "validation": {"start": "2020-01-01T00:00:00Z", "end": "2020-12-31T23:59:59Z"}}
+
+
 @pytest.fixture
 def study(tmp_path):
     source(tmp_path, "prep", "data-processing/prepare-discharge-timeseries", {"series_metadata.json": '{"unit":"m3/s","timezone":"Asia/Shanghai"}'})
-    source(tmp_path, "sim", "hydrological-modeling/run-lumped-hbv-model", {"simulation_table.csv": "time,Q,is_warmup\n2020-01-01,1,True\n2020-01-02,2,False\n"}, {"timestep_hours": 24, "warmup_steps": 1})
+    source(tmp_path, "sim", "hydrological-modeling/run-lumped-hbv-model", {"simulation_table.csv": "time,Q,is_warmup\n2020-01-01T00:00:00Z,1,True\n2020-01-02T00:00:00Z,2,False\n"}, {"timestep_hours": 24, "warmup_steps": 1})
     source(tmp_path, "eval", "evaluation-diagnostics/compute-continuous-series-metrics",
            {"series_metrics.csv": "metric,value,unit,status\nnse,0.85,dimensionless,ok\nvolume_bias,-10,m3,ok\nrelative_volume_bias,-0.1,dimensionless,ok\nmae,unavailable,m3/s,unavailable\n"}, {"timestep_hours": 24})
     manifest = tmp_path / "study-manifest.json"
-    write(manifest, {"schema_version": "1.0", "title": "研究 study", "required_preprocessing": ["prep"],
+    evaluation_input(tmp_path / 'eval/result.json', 'time,Q_obs,Q_total\n2020-01-02T00:00:00Z,2,2\n')
+    write(manifest, {"schema_version": "2.0", "split_periods": SPLIT_PERIODS, "title": "研究 study", "required_preprocessing": ["prep"],
                      "sources": [{"id": "prep", "stage": "preprocessing", "result": "prep/result.json"},
                                  {"id": "sim", "stage": "simulation", "result": "sim/result.json"},
                                  {"id": "eval", "stage": "evaluation", "result": "eval/result.json",
-                                  "context": {"mode": "continuous", "split": "validation", "period": {"start": "2020-01-02", "end": "2020-01-02"}}}],
-                     "runs": [{"id": "hbv-run", "simulation": "sim", "evaluations": ["eval"]}]})
+                                  "context": {"mode": "continuous", "split": "validation", "period": {"start": "2020-01-02T00:00:00Z", "end": "2020-01-02T00:00:00Z"}}}],
+                     "runs": [{"id": "hbv-run", "name": "HBV", "kind": "baseline", "series": series_binding(tmp_path / 'sim/simulation_table.csv'), "simulation": "sim", "evaluations": ["eval"]}]})
     return manifest
 
 
@@ -178,12 +196,13 @@ def test_event_multirun_english_and_warning(study, tmp_path):
     m = read(study)
     m["language"] = "en"
     source(tmp_path, "events", "evaluation-diagnostics/compute-event-flood-metrics",
-           {"event_metrics.csv": "event_id,volume_error_relative,qualified\nevent-a,-0.2,unavailable\nevent-b,0.1,unavailable\n"})
+           {"event_metrics.csv": "event_id,start,end,volume_error_relative,qualified\nevent-a,2020-01-02T00:00:00Z,2020-01-02T00:00:00Z,-0.2,unavailable\nevent-b,2020-01-02T00:00:00Z,2020-01-02T00:00:00Z,0.1,unavailable\n"})
     m["sources"].append({"id": "events", "stage": "evaluation", "result": "events/result.json",
-                          "context": {"mode": "event_collection", "split": "validation", "event_ids": ["event-a", "event-b"]}})
-    source(tmp_path, "sim-two", "hydrological-modeling/run-lumped-tank-model", {"simulation_table.csv": "time,Q\n2020-01-02,2\n"})
+                          "context": {"mode": "event_collection", "split": "validation", "period": {"start":"2020-01-02T00:00:00Z","end":"2020-01-02T00:00:00Z"}, "event_ids": ["event-a", "event-b"]}})
+    evaluation_input(tmp_path / 'events/result.json', 'event_id,time,Q_obs,Q_total\nevent-a,2020-01-02T00:00:00Z,2,2\nevent-b,2020-01-02T00:00:00Z,2,2\n')
+    source(tmp_path, "sim-two", "hydrological-modeling/run-lumped-tank-model", {"simulation_table.csv": "time,Q\n2020-01-02T00:00:00Z,2\n"})
     m["sources"].append({"id": "sim-two", "stage": "simulation", "result": "sim-two/result.json"})
-    m["runs"].append({"id": "tank-run", "simulation": "sim-two", "evaluations": ["events"]})
+    m["runs"].append({"id": "tank-run", "name":"Tank", "kind":"baseline", "series":series_binding(tmp_path/'sim-two/simulation_table.csv'), "simulation": "sim-two", "evaluations": ["events"]})
     write(study, m)
     report = finalize(study, prepare(study, tmp_path / "draft"), tmp_path / "report")
     data = read(report / "report.json")
@@ -257,18 +276,18 @@ def test_calibration_splits_and_figures_are_preserved(study, tmp_path):
 
 def test_hashed_evaluation_input_period_cannot_be_misdeclared(study, tmp_path):
     series = tmp_path / "eval/input.csv"
-    series.write_text("time,Q_obs,Q_total\n2020-01-02,2,2\n", encoding="utf-8")
+    series.write_text("time,Q_obs,Q_total\n2020-01-02T00:00:00Z,2,2\n", encoding="utf-8")
     path = tmp_path / "eval/result.json"
     doc = read(path)
     doc["inputs"]["series"] = {"path": "input.csv", "sha256": hashlib.sha256(series.read_bytes()).hexdigest()}
     write(path, doc)
     prepare(study, tmp_path / "valid")
     m = read(study)
-    m["sources"][2]["context"]["period"]["end"] = "2021-01-01"
+    m["sources"][2]["context"]["period"]["end"] = "2021-01-01T00:00:00Z"
     write(study, m)
     r = run(GEN / "examples/generate_hydrological_study_report.py", "prepare", "--study-manifest", study, "--output-dir", tmp_path / "invalid")
     assert r.returncode == 1
-    assert "contradicts hashed input" in r.stderr
+    assert "contradicts scored input" in r.stderr
 
 
 def test_semantic_coverage_and_incomplete_narrative_cannot_pass(study, tmp_path):
@@ -307,6 +326,7 @@ def test_packaged_schemas_runtime_and_catalog_are_current():
     categories, _ = load_category_registry(ROOT)
     supported = {r.source_ref for r in discover_atomic_skills(ROOT, categories)
                  if r.category not in ("post-processing", "visualization-reporting") or r.name.startswith("visualize-")}
+    supported.add('post-processing/correct-residual-with-ml')
     assert set(read(GEN / "assets/upstream-catalog.json")) == supported
     assert (GEN / "examples/_report_common.py").read_bytes() == (REV / "examples/_report_common.py").read_bytes()
     for schema in (ROOT / "resources/schemas").glob("study-*.schema.json"):
@@ -316,7 +336,7 @@ def test_packaged_schemas_runtime_and_catalog_are_current():
 
 def test_event_scope_and_metric_unit_contract_conflicts_stop(study, tmp_path):
     m = read(study)
-    m["sources"][2]["context"] = {"mode": "event_collection", "split": "validation", "event_ids": ["declared-event"]}
+    m["sources"][2]["context"] = {"mode": "event_collection", "split": "validation", "period":{"start":"2020-01-02T00:00:00Z","end":"2020-01-02T00:00:00Z"}, "event_ids": ["declared-event"]}
     doc = read(tmp_path / "eval/result.json")
     doc["skill"] = "evaluation-diagnostics/compute-event-flood-metrics"
     path = tmp_path / "eval/event_metrics.csv"

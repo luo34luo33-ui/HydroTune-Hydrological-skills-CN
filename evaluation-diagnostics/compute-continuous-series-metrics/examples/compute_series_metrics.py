@@ -25,6 +25,7 @@ from _diagnostics_common import (
     r_squared,
     read_table,
     require_columns,
+    scored_frame,
     rmse,
     write_result,
     write_table,
@@ -63,7 +64,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if not path.is_file():
         raise ContractError(f"序列文件不存在: {path}")
     fmt = args.series_format or path.suffix.lower().lstrip(".")
-    frame = read_table(path, fmt, args.sheet)
+    frame = scored_frame(read_table(path, fmt, args.sheet))
     require_columns(frame, [args.time_column, args.observed_column, args.simulated_column], "序列")
 
     checks: list[dict[str, str]] = []
@@ -166,6 +167,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "observed_column": args.observed_column,
             "simulated_column": args.simulated_column,
             "time_column": args.time_column,
+            "sheet": args.sheet,
+            "scoring_policy": "exclude_unscored_and_warmup",
             "volume_unit": "m3",
         },
         "inputs": {"series": file_reference(path, args.output_dir)},

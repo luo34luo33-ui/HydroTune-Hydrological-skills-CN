@@ -21,6 +21,23 @@ class ContractError(RuntimeError):
 UNAVAILABLE = "unavailable"
 
 
+def scored_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Honor explicit score/warm-up flags before calculating any metric."""
+    selected = pd.Series(True, index=frame.index)
+    for column in ('scored', 'is_warmup'):
+        if column not in frame:
+            continue
+        tokens = frame[column].astype(str).str.strip().str.lower()
+        if not tokens.isin(('true', 'false', '1', '0')).all():
+            raise ContractError(f'{column} must contain explicit boolean values')
+        mask = tokens.isin(('true', '1'))
+        selected &= mask if column == 'scored' else ~mask
+    result = frame.loc[selected].copy()
+    if result.empty and any(column in frame for column in ('scored', 'is_warmup')):
+        raise ContractError('No scored samples after excluding warm-up/unscored rows')
+    return result
+
+
 def json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)

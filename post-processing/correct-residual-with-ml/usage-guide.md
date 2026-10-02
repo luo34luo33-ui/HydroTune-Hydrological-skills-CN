@@ -29,7 +29,7 @@ python scripts/correct_residual_ml.py \
   --table train_table.csv \
   --time-column time --base-column Q_total --observed-column Q_obs \
   --feature-columns P,Qt \
-  --lag-spec "residual_lag_source:0,1,2" \
+  --lag-spec "residual:1,2,3,4,5" \
   --backend random-forest \
   --hyperparameters '{"n_estimators": 200, "max_depth": 5}' \
   --random-state 2025 --split chronological \
@@ -50,10 +50,10 @@ python scripts/correct_residual_ml.py \
 
 ## What the Agent Will Do
 
-1. 校验后端、超参、随机种子与滞后配置；负步数直接拒绝。
+1. 校验后端、超参、随机种子与滞后配置；必须包含残差滞后 1 至 5，禁止当前 `residual`、`residual:0` 与负步数。
 2. 读取输入表并校验必需列；predict 模式从模型卡读取特征列与滞后配置并校验一致性。
-3. 构造滞后特征；不完整行按 `--lag-policy` 丢弃、显式填充或拒绝。
-4. 计算残差 `observed - base`；输入缺测按 `--missing-policy` 停止或丢行。
+3. 有观测时先计算残差 `observed - base`；无观测时校验输入历史 `residual` 列存在。
+4. 构造滞后特征；不完整行按 `--lag-policy` 丢弃、显式填充或拒绝。输入缺测按 `--missing-policy` 停止或丢行。
 5. train：划分训练/测试集、拟合、写出模型与模型卡；predict：加载模型并预测。
 6. 回代 `corrected = base + predicted_residual`，执行 QC 并写出校正表与 `result.json`。
 7. 预测残差非有限时不产出校正表，退出码 2。
@@ -80,7 +80,7 @@ python scripts/correct_residual_ml.py \
 | `--base-column` | 否 | 默认 `Q_total` |
 | `--observed-column` | train 是 | 默认 `Q_obs` |
 | `--feature-columns` | train 是 | 逗号分隔；predict 从模型卡读取 |
-| `--lag-spec` | 否 | `COLUMN:STEPS`，可重复；STEPS 为非负整数，逗号分隔 |
+| `--lag-spec` | train 是 | `COLUMN:STEPS`，可重复；必须包含 `residual:1,2,3,4,5`；predict 沿用模型卡；其他变量步数非负 |
 | `--lag-policy` | 否 | `drop`（默认）、`fill`、`fail` |
 | `--lag-fill-value` | `fill` 时是 | 显式填充值 |
 | `--backend` | 是 | 见后端表 |
@@ -95,9 +95,11 @@ python scripts/correct_residual_ml.py \
 | `--output-format` | 否 | `csv`（默认）、`parquet`、`xlsx` |
 | `--output-dir` | 是 | 唯一写入位置，非空需 `--overwrite` |
 
-`--lag-spec` 示例：`--lag-spec "residual:1,2,3,4,5" --lag-spec "P:5"`，生成列 `residual_lag_1`…`residual_lag_5` 与 `P_lag_5`。
+必需配置为 `--lag-spec "residual:1,2,3,4,5"`，生成 `residual_lag_1`…`residual_lag_5`，分别对应 `residual(t-1)` 至 `residual(t-5)`。步数按输入序列的时间步计算；输入需按时间顺序排列且步长规则。可附加其他合法特征，如 `--lag-spec "P:5"`，但不得省略任一必需残差滞后，也不得将当前 `residual` 或 `residual:0` 输入模型。
 
-`residual` 是本 Skill 用 `observed - base` 计算的列，在构造滞后特征之前生成，因此可以直接被 `--lag-spec` 引用，这正是源 notebook 用残差自身滞后做特征的做法。predict 模式没有观测列，`residual` 不会生成；此时若滞后配置依赖 `residual`，输入表必须自带该列（递推式预测由上游提供前期残差），否则会报列不存在。
+`residual` 在有观测列时由本 Skill 用 `observed - base` 计算，在构造滞后特征之前生成。predict 模式无观测列时，输入表必须自带由已可用历史观测与基准模拟得到的同定义 `residual` 列；每个预测时刻所需的前 5 步残差必须已经可用，不得引入尚不可用的观测。缺少历史残差来源时停止，不自动以预测残差替代；本脚本不执行递推预测。
+
+默认 `--lag-policy drop` 在输入完整且仅使用必需滞后时丢弃开头 5 行，并记录丢弃数量；附加更长滞后时可能丢弃更多行。predict 同样校验模型卡是否包含完整残差滞后，旧模型不满足要求时拒绝使用并提示重新训练。
 
 ## Outputs
 
@@ -113,6 +115,7 @@ python scripts/correct_residual_ml.py \
 - 期待自动填充缺测：默认停止；`drop-rows` 也只处理输入缺测，滞后不完整行由 `--lag-policy` 单独决定。
 - 单独拷贝 `model.joblib`：模型卡记录特征列与滞后配置，缺了它 predict 会拒绝。
 - 用负 lag 引入未来信息：会被直接拒绝。
+- 省略残差滞后 1 至 5 或输入当前残差：会被直接拒绝；这 5 个历史残差是必需输入。
 - 期待本 Skill 评价好坏：评价属于 `evaluation-diagnostics`。
 
 ## 有意改变（相对源 notebook）

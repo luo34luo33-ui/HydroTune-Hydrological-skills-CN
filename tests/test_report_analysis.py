@@ -2,16 +2,18 @@
 from pathlib import Path
 import hashlib
 import pytest
-from test_reporting_examples import read,write,run,source,GEN,REV,finalize,review,semantic_file
+from test_reporting_examples import read,write,run,source,GEN,REV,finalize,review,semantic_file,series_binding,evaluation_input,SPLIT_PERIODS
 
 
 def event_study(tmp):
-    source(tmp,'sim','hydrological-modeling/run-lumped-hbv-model',{'simulation_table.csv':'time,Q\n2020-01-01,1\n'})
+    source(tmp,'sim','hydrological-modeling/run-lumped-hbv-model',{'simulation_table.csv':'time,Q\n2020-01-01T00:00:00Z,2\n2020-01-01T01:00:00Z,3\n2020-01-01T02:00:00Z,4\n'})
     scores=[-.5,-2,.3,-2,.8,None,.1]
     metrics='event_id,start,end,nse,peak_error_relative,volume_error_relative,peak_time_error_hours\n'
-    for i,n in enumerate(scores):metrics+=f'e{i},2020-01-01T00:00:00,2020-01-01T02:00:00,{n if n is not None else "unavailable"},-0.1,0.2,1\n'
+    for i,n in enumerate(scores):metrics+=f'e{i},2020-01-01T00:00:00Z,2020-01-01T02:00:00Z,{n if n is not None else "unavailable"},-0.1,0.2,1\n'
     source(tmp,'eval','evaluation-diagnostics/compute-event-flood-metrics',{'event_metrics.csv':metrics},dict(volume_unit='m3',timestep_hours=1))
-    p=tmp/'manifest.json';write(p,dict(schema_version='1.0',title='Simulation',language='en',sources=[dict(id='sim',stage='simulation',result='sim/result.json'),dict(id='eval',stage='evaluation',result='eval/result.json',context=dict(mode='event_collection',split='validation',event_ids=[f'e{i}' for i in range(7)]))],runs=[dict(id='run',simulation='sim',evaluations=['eval'])]))
+    rows='event_id,time,Q_obs,Q_total\n'+''.join(f'e{i},2020-01-01T0{h}:00:00Z,{o},{s}\n' for i in range(7) for h,o,s in [(0,1,2),(1,4,3),(2,2,4)])
+    evaluation_input(tmp/'eval/result.json',rows)
+    p=tmp/'manifest.json';write(p,dict(schema_version='2.0',split_periods=SPLIT_PERIODS,title='Simulation',language='en',sources=[dict(id='sim',stage='simulation',result='sim/result.json'),dict(id='eval',stage='evaluation',result='eval/result.json',context=dict(mode='event_collection',split='validation',period=dict(start='2020-01-01T00:00:00Z',end='2020-01-01T02:00:00Z'),event_ids=[f'e{i}' for i in range(7)]))],runs=[dict(id='run',name='HBV',kind='baseline',series=series_binding(tmp/'sim/simulation_table.csv'),simulation='sim',evaluations=['eval'])]))
     return p
 
 
@@ -40,7 +42,7 @@ def test_independent_simulation_input_ranking_exclusions(tmp_path):
 
 
 def linked(p,tmp):
-    f=tmp/'process.csv';f.write_text('time,observed,simulated,is_warmup,scored,rain\n2019-12-31T23:00:00,100,0,true,false,0\n2020-01-01T00:00:00,1,2,false,true,1\n2020-01-01T01:00:00,4,3,false,true,0\n2020-01-01T02:00:00,2,4,false,true,0\n',encoding='utf-8')
+    f=tmp/'process.csv';f.write_text('time,observed,simulated,is_warmup,scored,rain\n2019-12-31T23:00:00Z,100,0,true,false,0\n2020-01-01T00:00:00Z,1,2,false,true,1\n2020-01-01T01:00:00Z,4,3,false,true,0\n2020-01-01T02:00:00Z,2,4,false,true,0\n',encoding='utf-8')
     m=read(p);m['analysis']=dict(worst_event_count=1,event_processes=[dict(run_id='run',evaluation_source='eval',event_id='e1',path='process.csv',sha256=hashlib.sha256(f.read_bytes()).hexdigest(),time_column='time',observed_column='observed',simulated_column='simulated',warmup_column='is_warmup',scored_column='scored',precipitation_column='rain',precipitation_unit='mm/step')]);write(p,m);return f
 
 
@@ -87,10 +89,11 @@ def test_upstream_chinese_qualification_flags_require_explicit_thresholds(tmp_pa
 
 def test_multirun_scopes_are_not_merged(tmp_path):
     p=event_study(tmp_path)
-    source(tmp_path,'sim-two','hydrological-modeling/run-lumped-tank-model',{'simulation_table.csv':'time,Q\n2020-01-01,1\n'})
-    source(tmp_path,'eval-two','evaluation-diagnostics/compute-event-flood-metrics',{'event_metrics.csv':'event_id,start,end,nse\ne0,2020-01-01,2020-01-02,-9\n'})
-    m=read(p);m['sources'] += [dict(id='sim-two',stage='simulation',result='sim-two/result.json'),dict(id='eval-two',stage='evaluation',result='eval-two/result.json',context=dict(mode='event_collection',split='calibration',event_ids=['e0']))]
-    m['runs'].append(dict(id='run-two',simulation='sim-two',evaluations=['eval-two']));write(p,m)
+    source(tmp_path,'sim-two','hydrological-modeling/run-lumped-tank-model',{'simulation_table.csv':'time,Q\n2019-01-01T00:00:00Z,1\n'})
+    source(tmp_path,'eval-two','evaluation-diagnostics/compute-event-flood-metrics',{'event_metrics.csv':'event_id,start,end,nse\ne0,2019-01-01T00:00:00Z,2019-01-01T00:00:00Z,-9\n'})
+    evaluation_input(tmp_path/'eval-two/result.json','event_id,time,Q_obs,Q_total\ne0,2019-01-01T00:00:00Z,1,1\n')
+    m=read(p);m['sources'] += [dict(id='sim-two',stage='simulation',result='sim-two/result.json'),dict(id='eval-two',stage='evaluation',result='eval-two/result.json',context=dict(mode='event_collection',split='calibration',period=dict(start='2019-01-01T00:00:00Z',end='2019-01-01T00:00:00Z'),event_ids=['e0']))]
+    m['runs'].append(dict(id='run-two',name='Tank',kind='baseline',series=series_binding(tmp_path/'sim-two/simulation_table.csv'),simulation='sim-two',evaluations=['eval-two']));write(p,m)
     draft=prepare(p,tmp_path/'draft');doc=read(draft);worst=doc['analysis']['details']['worst_events']
     assert len([r for r in worst if r['run']=='run'])==5 and len([r for r in worst if r['run']=='run-two'])==1
     metrics=[r for t in doc['analysis']['tables'] if t['section']=='evaluation' for r in t['rows'] if r['metric']=='nse']

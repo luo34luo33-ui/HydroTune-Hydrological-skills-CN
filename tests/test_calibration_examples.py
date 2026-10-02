@@ -63,9 +63,9 @@ class Evaluator:
         observed = np.linspace(1.0, 2.0, 12)
         shift = (parameters['x'] - 0.25) + (parameters['y'] - 0.75)
         frame = pd.DataFrame({'observed': observed, 'simulated': observed + shift, 'scored': [False, False] + [True] * 10, 'precipitation': np.linspace(0, 5, 12)})
-        if self.problem['data_shape'] == 'continuous': frame.insert(0, 'time', pd.date_range('2020-01-01', periods=12, freq='D'))
+        if self.problem['data_shape'] == 'continuous': frame.insert(0, 'time', pd.date_range('2020-01-01' if split == 'calibration' else '2021-01-01', periods=12, freq='D', tz='UTC'))
         else:
-            frame.insert(0, 'event_id', ['E01'] * 6 + ['E02'] * 6)
+            frame.insert(0, 'event_id', (['C01'] * 6 + ['C02'] * 6) if split == 'calibration' else (['E01'] * 6 + ['E02'] * 6))
             frame.insert(1, 'step', list(range(6)) * 2)
         return {**result, 'series': frame}
 

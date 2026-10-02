@@ -87,3 +87,5 @@ python scripts/compute_series_metrics.py \
 - `evaluation-diagnostics/compute-event-flood-metrics`：过程层面指标。
 - `evaluation-diagnostics/aggregate-event-metrics`：跨场次汇总。
 - `post-processing/correct-residual-with-ml`：被评价的校正序列来源。
+
+评分输入若含 scored 或 is_warmup，必须为显式布尔值；先排除 scored=false 和 is_warmup=true，再计算指标。result.parameters.scoring_policy 记录此规则，sheet 记录实际工作表。评分后的连续时间轴仍须通过步长 QC，不自动补齐缺口。

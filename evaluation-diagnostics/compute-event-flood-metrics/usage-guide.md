@@ -110,3 +110,5 @@ python scripts/compute_event_metrics.py \
 - `evaluation-diagnostics/aggregate-event-metrics`：跨场次汇总与合格率。
 - `evaluation-diagnostics/compute-continuous-series-metrics`：连续序列视角。
 - `post-processing/correct-residual-with-ml`：被评价的校正结果来源。
+
+评分输入若含 scored 或 is_warmup，先排除非评分和预热行；记录 scoring_policy 与 event_id_column。events-dir 模式逐文件保存输入路径和哈希，便于新版研究清单核验完整事件范围；没有事件列时以文件名或 XLSX 工作表名作为事件标识。

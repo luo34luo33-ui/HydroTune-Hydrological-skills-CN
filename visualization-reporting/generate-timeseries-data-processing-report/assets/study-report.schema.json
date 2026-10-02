@@ -72,12 +72,85 @@
           "calibration": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "baseline",
+              "corrected"
+            ]
+          },
+          "series": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "time_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "simulated_column": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sheet": {
+                "type": "string"
+              },
+              "unit": {
+                "const": "m3/s"
+              }
+            },
+            "required": [
+              "path",
+              "sha256",
+              "time_column",
+              "simulated_column",
+              "unit"
+            ]
+          },
+          "parent_run": {
+            "type": "string",
+            "minLength": 1
+          },
+          "postprocessing": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
           "id",
           "simulation",
-          "evaluations"
+          "evaluations",
+          "name",
+          "kind",
+          "series"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "corrected"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "parent_run",
+                "postprocessing"
+              ]
+            }
+          }
         ]
       },
       "minItems": 1

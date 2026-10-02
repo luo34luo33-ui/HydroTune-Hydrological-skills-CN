@@ -5,6 +5,10 @@ inputs:
     description: 五种受支持 model-calibration Skill 之一生成且 artifact 哈希可验证的 result.json。
     required: true
     format: JSON
+  - id: event_manifest
+    description: continuous 模式可选的哈希事件表引用（event_id,start,end）及显式 step_seconds。
+    required: false
+    format: JSON
 outputs:
   - id: calibration_overview
     description: 收敛轨迹、参数位置和两 split 已有指标总览。
@@ -30,3 +34,6 @@ invariants:
   - 所有图白底无图名，轴标题完整，实测黑色实线，模拟颜色各异。
   - 多模拟序列按显式事件与时间或步号对齐，单位与 validation split 必须一致，不自动插值。
   - NSE 图例排除 warm-up，记录评分分母及不可用原因。
+
+  - continuous 的可选 event_manifest 使用 schema_version=1.0、step_seconds 和已哈希 events CSV（event_id,start,end）。
+  - 原验证序列逐场切片不重跑模型或率定；保留原数值、scored 和叠加结果，元数据包含真实事件 ID 与来源哈希。
