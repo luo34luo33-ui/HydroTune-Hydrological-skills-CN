@@ -236,13 +236,43 @@ bash ./install-codex.sh --categories data-processing --workflows all
 ./install-codex.ps1 --categories data-processing --workflows all
 ```
 
-Claude Code 使用 `install-claude.sh`/`.ps1`，OpenCode 使用 `install-opencode.sh`/`.ps1`。默认目标分别为：
+### Qwen Code CLI Agent
+
+将本仓库的 HydroTune Skills 安装到 Qwen Code：
+
+```bash
+bash ./install-qwen.sh
+bash ./install-qwen.sh --project /path/to/project
+```
+
+```powershell
+./install-qwen.ps1
+./install-qwen.ps1 --project C:\path\to\project
+```
+
+### CodeBuddy CLI Agent
+
+将本仓库的 HydroTune Skills 安装到 CodeBuddy：
+
+```bash
+bash ./install-codebuddy.sh
+bash ./install-codebuddy.sh --project /path/to/project
+```
+
+```powershell
+./install-codebuddy.ps1
+./install-codebuddy.ps1 --project C:\path\to\project
+```
+
+Claude Code 使用 `install-claude.sh`/`.ps1`，OpenCode 使用 `install-opencode.sh`/`.ps1`。各 Agent 的默认目标分别为：
 
 | Agent | 全局目录 | 项目目录 |
 |---|---|---|
 | Codex | `~/.agents/skills` | `.agents/skills` |
 | Claude Code | `~/.claude/skills` | `.claude/skills` |
 | OpenCode | `~/.config/opencode/skills` | `.opencode/skills` |
+| Qwen Code | `~/.qwen/skills` | `.qwen/skills` |
+| CodeBuddy | `~/.codebuddy/skills` | `.codebuddy/skills` |
 
 ### 常用参数
 
